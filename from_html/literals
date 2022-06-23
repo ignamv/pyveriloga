@@ -1,0 +1,130 @@
+!	
+!=	
+!==	
+"	
+#	
+# (	
+$	
+$root .	
+%	
+&	
+&&	
+&&&	
+'	
+'B0	
+'B1	
+'b0	
+'b1	
+'{	
+(	
+( "	
+( )	
+( <	
+( highz0 ,	
+( highz1 ,	
+( large )	
+( medium )	
+( small )	
+(*	
+)	
+) )	
+) ;	
+*	
+*)	
+**	
+*>	
++	
++:	
+,	
+, "	
+, highz0 )	
+, highz1 )	
+, inout	
+, input	
+, output	
+-	
+-:	
+->	
+-inf	
+.	
+/	
+0	
+01	
+1	
+1'B0	
+1'B1	
+1'BX	
+1'Bx	
+1'b0	
+1'b1	
+1'bX	
+1'bx	
+10	
+:	
+:config	
+;	
+<	
+<+	
+<<	
+<<<	
+<=	
+=	
+= (	
+==	
+===	
+=>	
+>	
+> )	
+>=	
+>>	
+>>>	
+?	
+@	
+@ (	
+@ (*)	
+@*	
+PATHPULSE$	
+PATHPULSE$ = (	
+[	
+\	
+]	
+^	
+^~	
+_	
+above (	
+absdelta (	
+ac_stim (	
+analog function	
+analog initial	
+analysis ( "	
+branch (	
+branch ( <	
+case (	
+casex (	
+casez (	
+cross (	
+ddt (	
+edge [	
+else if	
+else if (	
+flicker_noise (	
+for (	
+idt (	
+idtmod (	
+if (	
+noise_table (	
+noise_table_log (	
+repeat (	
+timer (	
+wait (	
+while (	
+white_noise (	
+{	
+|	
+||	
+}	
+} }	
+~	
+~&	
+~^	
+~|	
