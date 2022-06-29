@@ -11,6 +11,12 @@ from parser import (
     Port,
     InitializedVariable,
     Module,
+    Analog,
+    AnalogContribution,
+    AnalogSequence,
+    VariableAssignment,
+    FunctionCall,
+    Variables,
 )
 
 
@@ -23,6 +29,14 @@ from parser import (
         ("-hola", UnaryOp("-", Identifier("hola"))),
         ("-33.0", UnaryOp("-", Float(33))),
         ("hola ** 3", BinaryOp("**", Identifier("hola"), Int(3))),
+        (
+            "2 * (hola + 3)",
+            BinaryOp("*", Int(2), BinaryOp("+", Identifier("hola"), Int(3))),
+        ),
+        (
+            "(hola + 3) * 2",
+            BinaryOp("*", BinaryOp("+", Identifier("hola"), Int(3)), Int(2)),
+        ),
         ("-hola ** 3", BinaryOp("**", UnaryOp("-", Identifier("hola")), Int(3))),
         (
             "2 * hola ** 3",
@@ -146,20 +160,91 @@ module mymodule (pin1, pin2);
 inout pin1, pin2;
 real myreal;
 electrical mynet;
-int myint;
+integer myint;
+
+analog I(pin1, pin2) <+ 3;
+
+analog V(pin1) <+ 7;
+
+analog begin: mylabel
+    real analogreal;
+    myreal = 2 * (1 + V(pin1, pin2));
+    analogreal = V(pin1);
+    V(pin2) <+ 7;
+end
+
 endmodule
 """
     assert parse(src, "start_module") == Module(
-        name=Identifier(name="mymodule"),
+        name="mymodule",
         ports=[
-            Port(name=Identifier(name="pin1"), nature=None, direction="inout"),
-            Port(name=Identifier(name="pin2"), nature=None, direction="inout"),
+            Port(name="pin1", nature=None, direction="inout"),
+            Port(name="pin2", nature=None, direction="inout"),
         ],
-        reals=[
-            InitializedVariable(
-                name=Identifier(name="myreal"), type="real", initializer=None
-            )
+        variables=Variables(
+            {
+                "myreal": InitializedVariable(
+                    name="myreal", type="real", initializer=None
+                ),
+                "myint": InitializedVariable(
+                    name="myint", type="integer", initializer=None
+                ),
+            }
+        ),
+        nets=["mynet"],
+        analogs=[
+            Analog(
+                content=AnalogContribution(
+                    accessor="I", lvalue1="pin1", lvalue2="pin2", rvalue=Int(value=3)
+                )
+            ),
+            Analog(
+                content=AnalogContribution(
+                    accessor="V", lvalue1="pin1", lvalue2=None, rvalue=Int(value=7)
+                )
+            ),
+            Analog(
+                content=AnalogSequence(
+                    variables=Variables(
+                        {
+                            "analogreal": InitializedVariable(
+                                name="analogreal", type="real", initializer=None
+                            )
+                        }
+                    ),
+                    statements=[
+                        VariableAssignment(
+                            name="myreal",
+                            value=BinaryOp(
+                                operator="*",
+                                left=Int(value=2),
+                                right=BinaryOp(
+                                    operator="+",
+                                    left=Int(value=1),
+                                    right=FunctionCall(
+                                        name="V",
+                                        arguments=[
+                                            Identifier(name="pin1"),
+                                            Identifier(name="pin2"),
+                                        ],
+                                    ),
+                                ),
+                            ),
+                        ),
+                        VariableAssignment(
+                            name="analogreal",
+                            value=FunctionCall(
+                                name="V", arguments=[Identifier(name="pin1")]
+                            ),
+                        ),
+                        AnalogContribution(
+                            accessor="V",
+                            lvalue1="pin2",
+                            lvalue2=None,
+                            rvalue=Int(value=7),
+                        ),
+                    ],
+                )
+            ),
         ],
-        integers=[],
-        nets=[Identifier(name="mynet"), Identifier(name="myint")],
     )

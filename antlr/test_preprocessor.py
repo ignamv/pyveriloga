@@ -109,7 +109,7 @@ start
 `define f(x) 2 * x
 `define g(x) 3 * x
 `f(`g(4))
-end
+theend
 """,
             [
                 (VerilogALexer.SIMPLE_IDENTIFIER, "start", [("dummyfile", 2, 0)]),
@@ -150,7 +150,7 @@ end
                         ("dummyfile", 5, 6),
                     ],
                 ),
-                (VerilogALexer.SIMPLE_IDENTIFIER, "end", [("dummyfile", 6, 0)]),
+                (VerilogALexer.SIMPLE_IDENTIFIER, "theend", [("dummyfile", 6, 0)]),
                 (Token.EOF, "<EOF>", [("dummyfile", 7, 0)]),
             ],
         ),
@@ -160,7 +160,7 @@ start
 `define f(x) 2 * `g(x)
 `define g(x) 3 * x
 `f(4)
-end
+theend
 """,
             [
                 (VerilogALexer.SIMPLE_IDENTIFIER, "start", [("dummyfile", 2, 0)]),
@@ -192,7 +192,7 @@ end
                         ("dummyfile", 5, 3),
                     ],
                 ),
-                (VerilogALexer.SIMPLE_IDENTIFIER, "end", [("dummyfile", 6, 0)]),
+                (VerilogALexer.SIMPLE_IDENTIFIER, "theend", [("dummyfile", 6, 0)]),
                 (Token.EOF, "<EOF>", [("dummyfile", 7, 0)]),
             ],
         ),

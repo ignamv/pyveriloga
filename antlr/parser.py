@@ -3,6 +3,8 @@ from generated.VerilogALexer import VerilogALexer
 from generated.VerilogAParser import VerilogAParser
 from generated.VerilogAParserVisitor import VerilogAParserVisitor
 from preprocessor import VerilogAPreprocessor, lex
+from typing import Mapping
+from verilogatypes import integertype, realtype, VerilogAType
 
 from dataclasses import dataclass, field
 
@@ -14,6 +16,75 @@ def parse(source, rule):
     tree = getattr(parser, rule)()
     assert tree is not None, "Parse error"
     return MyVisitor().visit(tree=tree)
+
+
+@dataclass
+class VariableAssignment:
+    lvalue: str
+    value: object
+    type: VerilogAType = None
+
+
+@dataclass
+class InitializedVariable:
+    name: str
+    type: VerilogAType
+    initializer: object
+    compiled: object = None
+
+
+@dataclass
+class Analog:
+    content: object = None
+    compiled: object = None
+
+
+@dataclass
+class Variables:
+    variables: Mapping[str, InitializedVariable] = field(default_factory=dict)
+
+    def declare(self, variable):
+        assert variable.name not in self.variables
+        self.variables[variable.name] = variable
+
+    def __getitem__(self, name):
+        return self.variables[name]
+
+    def __iter__(self):
+        return iter(self.variables.values())
+
+
+@dataclass
+class AnalogSequence:
+    variables: Variables = field(default_factory=Variables)
+    statements: list = field(default_factory=list)
+
+
+@dataclass
+class FunctionSignature:
+    returntype: VerilogAType
+    parameters: [VerilogAType]
+
+
+@dataclass
+class Function:
+    name: str
+    signature: FunctionSignature
+    compiled: object = None
+
+
+@dataclass
+class FunctionCall:
+    name: str
+    arguments: list
+
+
+@dataclass
+class AnalogContribution:
+    accessor: str
+    lvalue1: str
+    lvalue2: str = None
+    rvalue: object = None
 
 
 @dataclass
@@ -30,19 +101,12 @@ class Port(Net):
 
 
 @dataclass
-class InitializedVariable:
-    name: str
-    type: type
-    initializer: object
-
-
-@dataclass
 class Module:
     name: str
+    variables: Variables = field(default_factory=Variables)
     ports: [Port] = field(default_factory=list)
-    reals: [InitializedVariable] = field(default_factory=list)
-    integers: [InitializedVariable] = field(default_factory=list)
     nets: [Net] = field(default_factory=list)
+    analogs: [Analog] = field(default_factory=list)
 
     def newPort(self, name):
         for port in self.ports:
@@ -56,11 +120,16 @@ class Module:
 @dataclass
 class Identifier:
     name: str
+    type: VerilogAType = None
 
 
 @dataclass
 class Float:
     value: float
+    type: VerilogAType = realtype
+
+    def __post_init__(self):
+        self.value = float(self.value)
 
 
 @dataclass
@@ -71,6 +140,10 @@ class String:
 @dataclass
 class Int:
     value: int
+    type: VerilogAType = integertype
+
+    def __post_init__(self):
+        assert isinstance(self.value, int)
 
 
 @dataclass
@@ -78,12 +151,14 @@ class BinaryOp:
     operator: str
     left: object
     right: object
+    type: VerilogAType = None
 
 
 @dataclass
 class UnaryOp:
     operator: str
     child: object
+    type: VerilogAType = None
 
 
 @dataclass
@@ -91,6 +166,7 @@ class TernaryOp:
     condition: object
     iftrue: object
     iffalse: object
+    type: VerilogAType = None
 
 
 @dataclass
@@ -117,15 +193,13 @@ class NatureBinding:
     nature: str
 
 
-@dataclass
-class DomainBinding:
-    discrete_or_continuous: str
-
-
 class MyVisitor(ParseTreeVisitor):
     def __init__(self):
         self.disciplines = []
         self.modules = []
+        self.active_module = None
+        self.active_context = None
+        self.active_discipline = None
         with open("single_identifier_rules.txt") as fd:
             single_identifier_rules = set(fd.read().split())
         single_identifier_rules |= set(
@@ -221,6 +295,9 @@ expr12
         else:
             raise Exception("Unexpected number of children", childcount)
 
+    def visitParenthesized_expr(self, ctx):
+        return self.visit(ctx.expression())
+
     def visitNature_attribute_expression(self, ctx):
         x = self.visit(ctx.getChild(0))
         if isinstance(x, Identifier):
@@ -270,21 +347,24 @@ expr12
         return discipline
 
     def visitModule_declaration(self, ctx):
-        module = Module(name=self.visit(ctx.module_identifier()))
+        module = Module(name=self.visit(ctx.module_identifier()).name)
         self.modules.append(module)
         self.active_module = module
+        self.active_context = module
         self.visitChildren(ctx)
         # for child in ctx.getChildren():
         # self.visit(child)
+        self.active_context = None
         self.active_module = None
         return module
 
     def visitList_of_ports(self, ctx):
         for port in ctx.port():
-            self.active_module.newPort(self.visit(port))
+            self.active_module.newPort(self.visit(port).name)
 
     def visitList_of_port_identifiers(self, ctx):
-        names = list(map(self.visit, ctx.port_identifier()))
+        identifiers = list(map(self.visit, ctx.port_identifier()))
+        names = [identifier.name for identifier in identifiers]
         for name in names:
             self.active_module.newPort(name)
         return names
@@ -297,15 +377,17 @@ expr12
             self.active_module.newPort(port).direction = "inout"
 
     def visitInteger_declaration(self, ctx):
-        self.active_module.integers.extend(
-            self.visit(ctx.list_of_variable_identifiers())
-        )
+        for var in self.visit(ctx.list_of_variable_identifiers()):
+            self.active_context.variables.declare(var)
 
     def visitReal_declaration(self, ctx):
-        self.active_module.reals.extend(self.visit(ctx.list_of_real_identifiers()))
+        for var in self.visit(ctx.list_of_real_identifiers()):
+            self.active_context.variables.declare(var)
 
     def visitNet_declaration(self, ctx):
-        self.active_module.nets.extend(self.visit(ctx.list_of_net_identifiers()))
+        self.active_module.nets.extend(
+            identifier.name for identifier in self.visit(ctx.list_of_net_identifiers())
+        )
 
     def visitList_of_variable_identifiers(self, ctx):
         return list(map(self.visit, ctx.variable_type()))
@@ -316,15 +398,58 @@ expr12
     def visitList_of_net_identifiers(self, ctx):
         return list(map(self.visit, ctx.ams_net_identifier()))
 
-    def visitVariable_type(self, ctx):
-        return InitializedVariable(
-            self.visit(ctx.variable_identifier()), self.visit(ctx.constant_expression())
-        )
-
     def visitReal_type(self, ctx):
         initializer = ctx.constant_expression()
         if initializer is not None:
             initializer = self.visit(initializer)
         return InitializedVariable(
-            self.visit(ctx.real_identifier()), "real", initializer
+            self.visit(ctx.real_identifier()).name, realtype, initializer
+        )
+
+    def visitVariable_type(self, ctx):
+        initializer = ctx.constant_expression()
+        if initializer is not None:
+            initializer = self.visit(initializer)
+        return InitializedVariable(
+            self.visit(ctx.variable_identifier()).name, integertype, initializer
+        )
+
+    def visitAnalog_construct(self, ctx):
+        analog = Analog(self.visit(ctx.getChild(1)))
+        self.active_module.analogs.append(analog)
+
+    def visitContribution_statement(self, ctx):
+        funcall = self.visit(ctx.branch_lvalue())
+        assert 1 <= len(funcall.arguments) <= 2
+        assert all(isinstance(arg, Identifier) for arg in funcall.arguments)
+        names = [arg.name for arg in funcall.arguments]
+        if len(names) == 1:
+            names.append(None)
+        rvalue = self.visit(ctx.analog_expression())
+        return AnalogContribution(
+            accessor=funcall.name, lvalue1=names[0], lvalue2=names[1], rvalue=rvalue
+        )
+
+    def visitFunction_call(self, ctx):
+        name = self.visit(ctx.hierarchical_function_identifier()).name
+        arguments = list(map(self.visit, ctx.expression()))
+        return FunctionCall(name, arguments)
+
+    def visitAnalog_seq_block(self, ctx):
+        seq = AnalogSequence()
+        self.active_context = seq
+        # TODO: use label
+        for declaration in ctx.analog_block_item_declaration():
+            self.visit(declaration)
+        seq.statements.extend(map(self.visit, ctx.analog_statement()))
+        self.active_context = None
+        return seq
+
+    def visitAnalog_procedural_assignment(self, ctx):
+        return self.visit(ctx.analog_variable_assignment())
+
+    def visitScalar_analog_variable_assignment(self, ctx):
+        return VariableAssignment(
+            self.visit(ctx.scalar_analog_variable_lvalue()).name,
+            self.visit(ctx.analog_expression()),
         )
