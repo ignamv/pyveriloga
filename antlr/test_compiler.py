@@ -53,16 +53,19 @@ def test_expression_to_function(expression, expected):
 )
 def test_resolve_type(expression, expectedtype):
     context = build_default_global_context()
-    context.update({
-        "realvar": InitializedVariable("realvar", realtype, 1.5),
-        "intvar": InitializedVariable("intvar", integertype, 5),
-        "sin": Function("sin", FunctionSignature(realtype, [realtype])),
-    })
+    context.update(
+        {
+            "realvar": InitializedVariable("realvar", realtype, 1.5),
+            "intvar": InitializedVariable("intvar", integertype, 5),
+            "sin": Function("sin", FunctionSignature(realtype, [realtype])),
+        }
+    )
     assert resolve_expression_tree_type(expression, context) == expectedtype
 
 
 def test_compile_module():
-    module = parse('''
+    module = parse(
+        """
 module modname(p1);
 inout p1;
 real globalreal1, globalreal2;
@@ -71,7 +74,9 @@ analog begin
   globalreal2 = globalreal1 * 2;
 end
 endmodule
-''', 'start_module')
+""",
+        "start_module",
+    )
     compiled_module = CompiledModule.compile(module)
     compiled_module.analogs[0]()
-    assert compiled_module.vars['globalreal2'] == 7.0
+    assert compiled_module.vars["globalreal2"] == 7.0

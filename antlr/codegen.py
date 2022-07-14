@@ -1,210 +1,154 @@
+from verilogatypes import VAType
 from llvmlite import ir
-from verilogatypes import realtype, integertype
-from parser import Int, Float, Identifier, UnaryOp, BinaryOp, Function, FunctionCall, FunctionSignature, AnalogSequence, VariableAssignment, InitializedVariable
-from dataclasses import dataclass, replace
+from functools import singledispatchmethod, partial
+import hir
+from customdict import CustomDict
 
 
-def calculate_expression_type(expression, context):
-    if isinstance(expression, (Int, Float)):
-        return expression.type
-    if isinstance(expression, Identifier):
-        return context[expression.name].type
-    if isinstance(expression, UnaryOp):
-        return resolve_expression_tree_type(expression.child, context)
-    if isinstance(expression, BinaryOp):
-        childcontext = resolve_expression_tree_type(
-            expression.left, context
-        ), resolve_expression_tree_type(expression.right, context)
-        if any(childtype == realtype for childtype in childcontext):
-            return realtype
-        assert all(childtype == integertype for childtype in childcontext)
-        return integertype
-    if isinstance(expression, FunctionCall):
-        function = context[expression.name]
-        assert isinstance(function, Function)
-        # Check call arguments
-        assert len(expression.arguments) == len(function.signature.parameters)
-        # TODO: check argument types
-        return function.signature.returntype
-    raise NotImplementedError(expression)
+llvmreal = ir.DoubleType()
+llvmint = ir.IntType(32)
+llvmi1 = ir.IntType(1)
 
 
-def resolve_expression_tree_type(expression, context):
-    ret = calculate_expression_type(expression, context)
-    expression.type = ret
-    return ret
+def vatype_to_llvmtype(vatype):
+    if vatype == VAType.real:
+        return llvmreal
+    elif vatype == VAType.integer:
+        return llvmint
+    elif isinstance(vatype, hir.FunctionSignature):
+        return ir.FunctionType(
+            vatype_to_llvmtype(vatype.returntype),
+            tuple(map(vatype_to_llvmtype, vatype.parameters)),
+        )
+    else:
+        raise Exception(vatype)
 
 
-def unaryop_to_llvm(expression, builder, context):
-    operator = expression.operator
-    child = expression_to_llvm_ir_inner(expression.child, builder, context)
-    if operator == "-":
-        return builder.fsub(ir.Constant(expression.type.llvmtype, 0), child)
-    raise NotImplementedError(operator)
+class CodegenContext:
+    def __init__(self):
+        self.irmodule = ir.Module(name=__file__)
+        self.builder = None
+        # Need a way to store compiled symbols (HIR functions or variables)
+        # which compares identity and not equality
+        self.compiled = CustomDict(key=id)
 
+    def declare_builtins(self):
+        # Declare LLVM intrinsics as extern
+        intrinsic_names = {
+            hir.sin: "llvm.sin.f64",
+            hir.pow_: "llvm.pow.f64",
+        }
+        for vafunc, name in intrinsic_names.items():
+            functype = vatype_to_llvmtype(vafunc.type)
+            llvmfunc = ir.Function(self.irmodule, functype, name=name)
+            self.compiled[vafunc] = llvmfunc
 
-def ensure_real(value, builder):
-    if value.type == realtype.llvmtype:
-        return value
-    return builder.sitofp(value, realtype.llvmtype)
+    @classmethod
+    def expression_to_llvm_module_ir(cls, expression, funcname):
+        codegen = cls()
+        codegen.declare_builtins()
+        functype = ir.FunctionType(vatype_to_llvmtype(expression.type), ())
+        func = ir.Function(codegen.irmodule, functype, name=funcname)
+        block = func.append_basic_block(name="entry")
+        codegen.builder = ir.IRBuilder(block)
+        codegen.builder.ret(codegen.expression_to_ir(expression))
+        return codegen.irmodule
 
+    @singledispatchmethod
+    def expression_to_ir(self, expression: hir.Expression):
+        raise NotImplementedError(type(expression))
 
-def binaryop_to_llvm(expression, builder, context):
-    operator = expression.operator
-    left = expression_to_llvm_ir_inner(expression.left, builder, context)
-    right = expression_to_llvm_ir_inner(expression.right, builder, context)
-    sametype_operators = {
-        "*": (builder.fmul, builder.mul),
-        "/": (builder.fdiv, builder.sdiv),
-        "+": (builder.fadd, builder.add),
-        "-": (builder.fsub, builder.sub),
-    }
-    if operator in sametype_operators:
-        realinstruction, intinstruction = sametype_operators[operator]
-        if expression.type == realtype:
-            return realinstruction(
-                ensure_real(left, builder), ensure_real(right, builder)
+    @expression_to_ir.register
+    def _(self, literal: hir.Literal):
+        return ir.Constant(vatype_to_llvmtype(literal.type), literal.value)
+
+    @expression_to_ir.register
+    def _(self, funcall: hir.FunctionCall):
+        func = funcall.function
+        args = [self.expression_to_ir(arg) for arg in funcall.arguments]
+        instructions = {
+            hir.integer_addition: self.builder.add,
+            hir.integer_subtraction: self.builder.sub,
+            hir.integer_product: self.builder.mul,
+            hir.integer_division: self.builder.sdiv,
+            hir.real_addition: self.builder.fadd,
+            hir.real_subtraction: self.builder.fsub,
+            hir.real_product: self.builder.fmul,
+            hir.real_division: self.builder.fdiv,
+            hir.cast_int_to_real: partial(self.builder.sitofp, typ=llvmreal),
+            hir.cast_real_to_int: partial(self.builder.fptosi, typ=llvmint),
+        }
+        if func in instructions:
+            return instructions[func](*args)
+        logical_instructions = {
+            hir.integer_equality: partial(self.builder.icmp_signed, cmpop="=="),
+            hir.integer_inequality: partial(self.builder.icmp_signed, cmpop="!="),
+            hir.real_equality: partial(self.builder.fcmp_ordered, cmpop="=="),
+            hir.real_inequality: partial(self.builder.fcmp_ordered, cmpop="!="),
+        }
+        if func in logical_instructions:
+            i1_result = logical_instructions[func](lhs=args[0], rhs=args[1])
+            return self.builder.zext(i1_result, llvmint)
+        if func in self.compiled:
+            return self.builder.call(self.compiled[func], args)
+        else:
+            raise NotImplementedError(func)
+
+    @expression_to_ir.register
+    def _(self, variable: hir.Variable):
+        pointer = self.variable_to_ir(variable)
+        return self.builder.load(pointer)
+
+    @classmethod
+    def module_to_llvm_module_ir(cls, module):
+        codegen = cls()
+        codegen.declare_builtins()
+        functype = ir.FunctionType(ir.VoidType(), ())
+        func = ir.Function(codegen.irmodule, functype, name="run_analog")
+        block = func.append_basic_block(name="entry")
+        codegen.builder = ir.IRBuilder(block)
+        for statement in module.statements:
+            codegen.statement_to_ir(statement)
+        codegen.builder.ret_void()
+        return codegen
+
+    def variable_to_ir(self, variable):
+        if variable not in self.compiled:
+            irvar = ir.GlobalVariable(
+                self.irmodule, vatype_to_llvmtype(variable.type), variable.name
             )
-        else:
-            return intinstruction(left, right)
+            irvar.initializer = ir.Constant(vatype_to_llvmtype(variable.type), 0)
+            self.compiled[variable] = irvar
+        return self.compiled[variable]
 
-    raise NotImplementedError(operator)
+    @singledispatchmethod
+    def statement_to_ir(self, statement: hir.Statement):
+        raise NotImplementedError(type(statement))
 
+    @statement_to_ir.register
+    def _(self, assignment: hir.Assignment):
+        value = self.expression_to_ir(assignment.value)
+        lvalue = self.variable_to_ir(assignment.lvalue)
+        self.builder.store(value, lvalue)
 
-def cast(expression, type_, builder, context):
-    inner = expression_to_llvm_ir_inner(expression, builder, context)
-    if expression.type == type_:
-        return inner
-    if type_ == realtype:
-        assert expression.type == integertype
-        return builder.sitofp(inner, type_.llvmtype)
-    elif type_ == integertype:
-        assert expression.type == realtype
-        return builder.fptosi(inner, type_.llvmtype)
-    else:
-        raise Exception(type_)
+    @statement_to_ir.register
+    def _(self, block: hir.Block):
+        for statement in block.statements:
+            self.statement_to_ir(statement)
 
-
-def functioncall_to_llvm(funcall, builder, context):
-    func = context[funcall.name]
-    assert isinstance(func, Function)
-    arguments = [cast(arg, type_, builder, context)
-            for arg, type_ in zip(funcall.arguments, func.signature.parameters)]
-    return builder.call(func.compiled, arguments)
-
-
-def readvariable(variable, builder):
-    return builder.load(variable.compiled)
-
-
-def expression_to_llvm_ir_inner(expression, builder, context):
-    if isinstance(expression, (Int, Float)):
-        return ir.Constant(expression.type.llvmtype, expression.value)
-    if isinstance(expression, UnaryOp):
-        return unaryop_to_llvm(expression, builder, context)
-    if isinstance(expression, BinaryOp):
-        return binaryop_to_llvm(expression, builder, context)
-    if isinstance(expression, FunctionCall):
-        return functioncall_to_llvm(expression, builder, context)
-    if isinstance(expression, InitializedVariable):
-        return readvariable(expression, builder)
-    raise NotImplementedError(type(expression))
-
-
-def expression_to_llvm_function(module, expression, type_, context):
-    functype = ir.FunctionType(type_.llvmtype, ())
-    func = ir.Function(module, functype, name="funcname")
-    block = func.append_basic_block(name="entry")
-    builder = ir.IRBuilder(block)
-    # a, b = func.args
-    result = expression_to_llvm_ir_inner(expression, builder, context)
-    builder.ret(result)
-    return func
-
-
-def expression_to_llvm_module_ir(expression, type_, context):
-    context = build_default_global_context()
-    # TODO: use given context
-    module = ir.Module(name=__file__)
-    for reference in context.values():
-        assert isinstance(reference, IntrinsicFunction)
-        signature = reference.signature
-        reference.compiled = ir.Function(
-            module,
-            ir.FunctionType(
-                signature.returntype.llvmtype,
-                tuple(type_.llvmtype for type_ in signature.parameters),
-            ),
-            reference.intrinsicname,
-        )
-    expression_to_llvm_function(module, expression, type_, context)
-    return str(module)
-
-
-@dataclass
-class IntrinsicFunction(Function):
-    intrinsicname: str = None
-
-
-def build_default_global_context():
-    ret = {
-        "sin": IntrinsicFunction("sin", FunctionSignature(realtype, [realtype]), intrinsicname="llvm.sin.f64"),
-        "pow": IntrinsicFunction("pow", FunctionSignature(realtype, [realtype, realtype]), intrinsicname="llvm.pow.f64"),
-    }
-    return ret
-
-
-def resolve_expression(expression, module):
-    if isinstance(expression, Identifier):
-        return module.variables[expression.name]
-    if isinstance(expression, (Float, Int)):
-        return expression
-    if isinstance(expression, UnaryOp):
-        return replace(expression, child=resolve_expression(expression.child))
-    if isinstance(expression, BinaryOp):
-        return replace(expression, 
-                left=resolve_expression(expression.left),
-                right=resolve_expression(expression.right),
-        )
-    else:
-        raise Exception(expression)
-
-
-
-def resolve_analog_sequence(analog_sequence, module):
-    for statement in analog_sequence.statements:
-        if isinstance(statement, VariableAssignment):
-            # TODO: look at analog block locals
-            lvalue = module.variables[statement.lvalue]
-            value = resolve_expression(statement.value, module)
-            yield replace(statement, lvalue=lvalue, value=value)
-        else:
-            raise Exception(statement)
-
-
-def compile_analog(analog_content, module, irmodule, name):
-    assert isinstance(analog_content, AnalogSequence)
-    statements = resolve_analog_sequence(analog_content, module)
-    functype = ir.FunctionType(ir.VoidType(), ())
-    func = ir.Function(irmodule, functype, name=name)
-    block = func.append_basic_block(name="entry")
-    builder = ir.IRBuilder(block)
-    for statement in statements:
-        if isinstance(statement, VariableAssignment):
-            builder.store(statement.value, expression_to_llvm_ir_inner(statement.lvalue, builder, {}))
-        else:
-            raise Exception(statement)
-    return func
-
-def module_to_llvm_ir(module):
-    context = build_default_global_context()
-    # TODO: use given context
-    irmodule = ir.Module(name=__file__)
-    for var in module.variables:
-        # TODO: use initializer
-        var.compiled = ir.GlobalVariable(irmodule, var.type.llvmtype, var.name)
-    for ii, analog in enumerate(module.analogs):
-        name = f'analog{ii}'
-        analog.compiled = compile_analog(analog.content, module, irmodule, name)
-
-    return str(module), module
+    @statement_to_ir.register
+    def _(self, if_: hir.If):
+        inequality = {
+            VAType.integer: hir.integer_inequality,
+            VAType.real: hir.real_inequality,
+        }[if_.condition.type]
+        zero = hir.Literal({VAType.integer: 0, VAType.real: 0.0}[if_.condition.type])
+        condition_hir = hir.FunctionCall(inequality, (if_.condition, zero))
+        condition_ir = self.builder.trunc(self.expression_to_ir(condition_hir), llvmi1)
+        with self.builder.if_else(condition_ir) as (then, otherwise):
+            with then:
+                if if_.then is not None:
+                    self.statement_to_ir(if_.then)
+            with otherwise:
+                if if_.else_ is not None:
+                    self.statement_to_ir(if_.else_)

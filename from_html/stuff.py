@@ -5,9 +5,9 @@ from collections import defaultdict
 from abc import ABC, abstractmethod
 import dataclasses
 from antlr4 import FileStream, CommonTokenStream, InputStream
-from BNFLexer import BNFLexer
-from BNFParser import BNFParser
-from BNFVisitor import BNFVisitor
+from generated.BNFLexer import BNFLexer
+from generated.BNFParser import BNFParser
+from generated.BNFVisitor import BNFVisitor
 from itertools import groupby
 import logging
 

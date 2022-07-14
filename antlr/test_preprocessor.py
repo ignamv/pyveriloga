@@ -1,12 +1,11 @@
 import pytest
 import dataclasses
-from antlr4 import FileStream, CommonTokenStream, InputStream, Token
-from generated.VerilogALexer import VerilogALexer
+
 from preprocessor import VerilogAPreprocessor, lex, MyToken
 
 
 def strip_token_origin(token):
-    return dataclasses.replace(token, origin=None)
+    return dataclasses.replace(token, origin=[])
 
 
 @pytest.mark.parametrize(
@@ -112,46 +111,45 @@ start
 theend
 """,
             [
-                (VerilogALexer.SIMPLE_IDENTIFIER, "start", [("dummyfile", 2, 0)]),
+                ("SIMPLE_IDENTIFIER", "start", [("dummyfile", 2, 1)]),
                 (
-                    VerilogALexer.UNSIGNED_NUMBER,
-                    "2",
-                    [("dummyfile", 5, 0), ("dummyfile", 3, 13)],
+                    "UNSIGNED_NUMBER",
+                    2,
+                    [("dummyfile", 5, 1), ("dummyfile", 3, 14)],
                 ),
-                (VerilogALexer.TIMES, "*", [("dummyfile", 5, 0), ("dummyfile", 3, 15)]),
+                ("TIMES", "*", [("dummyfile", 5, 1), ("dummyfile", 3, 16)]),
                 (
-                    VerilogALexer.UNSIGNED_NUMBER,
-                    "3",
+                    "UNSIGNED_NUMBER",
+                    3,
                     [
-                        ("dummyfile", 5, 0),
-                        ("dummyfile", 3, 17),
-                        ("dummyfile", 5, 3),
-                        ("dummyfile", 4, 13),
+                        ("dummyfile", 5, 1),
+                        ("dummyfile", 3, 18),
+                        ("dummyfile", 5, 4),
+                        ("dummyfile", 4, 14),
                     ],
                 ),
                 (
-                    VerilogALexer.TIMES,
+                    "TIMES",
                     "*",
                     [
-                        ("dummyfile", 5, 0),
-                        ("dummyfile", 3, 17),
-                        ("dummyfile", 5, 3),
-                        ("dummyfile", 4, 15),
+                        ("dummyfile", 5, 1),
+                        ("dummyfile", 3, 18),
+                        ("dummyfile", 5, 4),
+                        ("dummyfile", 4, 16),
                     ],
                 ),
                 (
-                    VerilogALexer.UNSIGNED_NUMBER,
-                    "4",
+                    "UNSIGNED_NUMBER",
+                    4,
                     [
-                        ("dummyfile", 5, 0),
-                        ("dummyfile", 3, 17),
-                        ("dummyfile", 5, 3),
-                        ("dummyfile", 4, 17),
-                        ("dummyfile", 5, 6),
+                        ("dummyfile", 5, 1),
+                        ("dummyfile", 3, 18),
+                        ("dummyfile", 5, 4),
+                        ("dummyfile", 4, 18),
+                        ("dummyfile", 5, 7),
                     ],
                 ),
-                (VerilogALexer.SIMPLE_IDENTIFIER, "theend", [("dummyfile", 6, 0)]),
-                (Token.EOF, "<EOF>", [("dummyfile", 7, 0)]),
+                ("SIMPLE_IDENTIFIER", "theend", [("dummyfile", 6, 1)]),
             ],
         ),
         (
@@ -163,37 +161,36 @@ start
 theend
 """,
             [
-                (VerilogALexer.SIMPLE_IDENTIFIER, "start", [("dummyfile", 2, 0)]),
+                ("SIMPLE_IDENTIFIER", "start", [("dummyfile", 2, 1)]),
                 (
-                    VerilogALexer.UNSIGNED_NUMBER,
-                    "2",
-                    [("dummyfile", 5, 0), ("dummyfile", 3, 13)],
+                    "UNSIGNED_NUMBER",
+                    2,
+                    [("dummyfile", 5, 1), ("dummyfile", 3, 14)],
                 ),
-                (VerilogALexer.TIMES, "*", [("dummyfile", 5, 0), ("dummyfile", 3, 15)]),
+                ("TIMES", "*", [("dummyfile", 5, 1), ("dummyfile", 3, 16)]),
                 (
-                    VerilogALexer.UNSIGNED_NUMBER,
-                    "3",
-                    [("dummyfile", 5, 0), ("dummyfile", 3, 17), ("dummyfile", 4, 13)],
+                    "UNSIGNED_NUMBER",
+                    3,
+                    [("dummyfile", 5, 1), ("dummyfile", 3, 18), ("dummyfile", 4, 14)],
                 ),
                 (
-                    VerilogALexer.TIMES,
+                    "TIMES",
                     "*",
-                    [("dummyfile", 5, 0), ("dummyfile", 3, 17), ("dummyfile", 4, 15)],
+                    [("dummyfile", 5, 1), ("dummyfile", 3, 18), ("dummyfile", 4, 16)],
                 ),
                 (
-                    VerilogALexer.UNSIGNED_NUMBER,
-                    "4",
+                    "UNSIGNED_NUMBER",
+                    4,
                     [
-                        ("dummyfile", 5, 0),
-                        ("dummyfile", 3, 17),
-                        ("dummyfile", 4, 17),
-                        ("dummyfile", 5, 0),
-                        ("dummyfile", 3, 20),
-                        ("dummyfile", 5, 3),
+                        ("dummyfile", 5, 1),
+                        ("dummyfile", 3, 18),
+                        ("dummyfile", 4, 18),
+                        ("dummyfile", 5, 1),
+                        ("dummyfile", 3, 21),
+                        ("dummyfile", 5, 4),
                     ],
                 ),
-                (VerilogALexer.SIMPLE_IDENTIFIER, "theend", [("dummyfile", 6, 0)]),
-                (Token.EOF, "<EOF>", [("dummyfile", 7, 0)]),
+                ("SIMPLE_IDENTIFIER", "theend", [("dummyfile", 6, 1)]),
             ],
         ),
     ],
@@ -202,6 +199,14 @@ def test_token_origin(src, expected):
     filename = "dummyfile"
     tokens = list(VerilogAPreprocessor(lex(content=src, filename=filename)))
     assert tokens == [
-        MyToken(type_, text, channel=0, origin=origin)
-        for type_, text, origin in expected
+        MyToken(type_, text, origin=origin) for type_, text, origin in expected
+    ]
+
+
+def test_lexer():
+    filename = "dummyfile"
+    src = "$temperature"
+    tokens = list(VerilogAPreprocessor(lex(content=src, filename=filename)))
+    assert tokens == [
+        MyToken("SYSTEM_IDENTIFIER", "$temperature", origin=[("dummyfile", 1, 1)]),
     ]

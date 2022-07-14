@@ -1,6 +1,23 @@
+from verilogatypes import VAType
+import hir
 from dataclasses import dataclass
-from ctypes import CFUNCTYPE, c_double, c_int32
-from codegen import expression_to_llvm_module_ir, resolve_expression_tree_type, module_to_llvm_ir
+from ctypes import c_double, c_int32, c_char_p, CFUNCTYPE
+
+
+def vatype_to_ctype(vatype):
+    if vatype == VAType.real:
+        return c_double
+    elif vatype == VAType.integer:
+        return c_int32
+    elif vatype == VAType.void:
+        return None
+    elif isinstance(vatype, hir.FunctionSignature):
+        return CFUNCTYPE(
+            vatype_to_ctype(vatype.returntype), *map(vatype_to_ctype, vatype.parameters)
+        )
+    else:
+        raise Exception(vatype)
+
 
 import llvmlite.binding as llvm
 
@@ -49,36 +66,5 @@ def compile_ir(llvm_ir):
     return mod
 
 
-def expression_to_function(expression, context):
-    type_ = resolve_expression_tree_type(expression, context)
-    llvm_ir = expression_to_llvm_module_ir(expression, type_, context)
-    mod = compile_ir(llvm_ir)
-
-    # Look up the function pointer (a Python int)
-    func_ptr = engine.get_function_address("funcname")
-
-    # Run the function via ctypes
-    cfunc = CFUNCTYPE(type_.ctype)(func_ptr)
-    return cfunc
-
-
-@dataclass
-class CompiledModule:
-    analogs: [object]
-    varpointers: dict
-
-    class Vars:
-        def __getitem__(self, name):
-            return varpointers[name][0]
-
-
-    @classmethod
-    def compile(cls, module):
-        llvm_ir, resolved_module = module_to_llvm_ir(module)
-        mod = compile_ir(llvm_ir)
-
-        analogs = [CFUNCTYPE(None)(engine.get_function_address(analog.compiled.name))
-                for analog in resolved_module.analogs]
-        varpointers = {var.name: POINTER(variable.type.ctype)(engine.get_global_value_address(var.compiled.name))
-                for var in resolved_module.variables}
-        return cls(analogs=analogs, varpointers=varpointers)
+def get_engine():
+    return engine

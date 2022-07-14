@@ -1,74 +1,23 @@
 import os
 import re
+from typing import List
 from dataclasses import dataclass, replace
 from itertools import takewhile, count
-from antlr4 import Token, InputStream
-from generated.VerilogALexer import VerilogALexer
-
-
-def token_code_to_name(code):
-    if code == -1:
-        return "EOF"
-    return VerilogALexer.symbolicNames[code]
-
-
-@dataclass
-class MyToken:
-    type: int
-    text: str
-    channel: int
-    origin: [(str, int, int)]
-
-    @property
-    def line(self):
-        return self.origin[-1][1]
-
-    @property
-    def column(self):
-        return self.origin[-1][2]
-
-    @classmethod
-    def from_antlr_token(cls, token, filename=None):
-        origin = [(filename, token.line, token.column)]
-        return cls(
-            type=token.type, text=token.text, channel=token.channel, origin=origin
-        )
-
-    def included_from(self, origin):
-        """Return copy of token with added path of include or macro call"""
-        return replace(self, origin=origin + self.origin)
-
-    def typename(self):
-        return token_code_to_name(self.type)
-
-    def __repr__(self):
-        origin = [
-            (os.path.basename(f) if f is not None else None, line, column)
-            for f, line, column in self.origin
-        ]
-        return f"MyToken({self.typename()}, {self.text!r}, {origin!r})"
-
-    # source
-    # channel
-    # start
-    # stop
-    # tokenIndex
-    # line
-    # column
-    # _text
+from lexer import lex
+from mytoken import MyToken
 
 
 @dataclass
 class Macro:
-    parameters: [str]
-    body: [MyToken]
+    parameters: List[str]
+    body: List[MyToken]
 
     def expand(self, arguments, origin):
         for tok in self.body:
             tok = tok.included_from(origin)
-            if tok.type == VerilogALexer.SIMPLE_IDENTIFIER:
+            if tok.type == "SIMPLE_IDENTIFIER":
                 try:
-                    idx = self.parameters.index(tok.text)
+                    idx = self.parameters.index(tok.value)
                 except ValueError:
                     pass
                 else:
@@ -76,26 +25,6 @@ class Macro:
                         yield argument_token.included_from(tok.origin)
                     continue
             yield tok
-
-
-def iter_tokens(tokensource):
-    while True:
-        ret = tokensource.nextToken()
-        yield ret
-        if ret.type == Token.EOF:
-            return
-
-
-def lex(filename=None, content=None):
-    if content is None:
-        assert (
-            filename is not None
-        ), "If filename is not provided then content is mandatory"
-        with open(filename) as fd:
-            content = fd.read()
-    input_stream = InputStream(content)
-    for raw_token in iter_tokens(VerilogALexer(input_stream)):
-        yield MyToken.from_antlr_token(raw_token, filename=filename)
 
 
 class VerilogAPreprocessor:
@@ -124,31 +53,34 @@ class VerilogAPreprocessor:
     def fail(self, why):
         raise Exception(why, self.last_token)
 
-    def output_generator(self, source=None, end=Token.EOF):
+    def output_generator(self, source=None, end=None):
         if source is None:
             source = self.input_iterator
         if not isinstance(end, tuple):
             end = (end,)
-        for token in source:
+        while True:
+            try:
+                token = next(source)
+            except StopIteration:
+                if None in end:
+                    return
+                else:
+                    self.fail("Unexpected EOF")
             if token.type in end:
-                if token.type == Token.EOF:
-                    yield token
                 return
-            if token.type == Token.EOF:
-                self.fail("Unexpected EOF")
-            elif token.type == VerilogALexer.DEFINE:
+            elif token.type == "DEFINE":
                 self.define()
-            elif token.type == VerilogALexer.IFDEF:
+            elif token.type == "IFDEF":
                 yield from self.ifdef()
-            elif token.type == VerilogALexer.ELSEDEF:
+            elif token.type == "ELSEDEF":
                 self.fail("Unexpected `else")
-            elif token.type == VerilogALexer.ENDIFDEF:
+            elif token.type == "ENDIFDEF":
                 self.fail("Unexpected `endif")
-            elif token.type == VerilogALexer.INCLUDE:
+            elif token.type == "INCLUDE":
                 yield from self.include()
-            elif token.type == VerilogALexer.MACROCALL:
+            elif token.type == "MACROCALL":
                 yield from self.macrocall()
-            elif token.type == VerilogALexer.NEWLINE:
+            elif token.type == "NEWLINE":
                 continue
             else:
                 yield token
@@ -161,35 +93,30 @@ class VerilogAPreprocessor:
         self.fail("Unexpected EOF")
 
     def define(self):
-        match = re.match(r"`define\s+([a-zA-Z_]\w*)(\(?)", self.last_token.text)
-        name, parenthesis = match.groups()
+        name, parenthesis = self.last_token.value
         if parenthesis:
             # Macro definition
             parameters = list(self.consume_macro_definition_parameters())
         else:
             # Basic definition
             parameters = []
-        body = list(self.takeuntil(lambda tok: tok.type == VerilogALexer.NEWLINE))[:-1]
+        body = list(self.takeuntil(lambda tok: tok.type == "NEWLINE"))[:-1]
         definition = Macro(parameters, body)
         self.definitions[name] = definition
 
     def consume_macro_definition_parameters(self):
         for ii in count():
             tok = next(self.input_iterator)
-            if tok.type == VerilogALexer.RPAREN:
+            if tok.type == "RPAREN":
                 return
             if ii != 0:
-                self.expect(
-                    VerilogALexer.COMMA, "macro parameter separator", last_token=True
-                )
+                self.expect("COMMA", "macro parameter separator", last_token=True)
                 next(self.input_iterator)
-            tok = self.expect(
-                VerilogALexer.SIMPLE_IDENTIFIER, "macro parameter", last_token=True
-            )
-            yield tok.text
+            tok = self.expect("SIMPLE_IDENTIFIER", "macro parameter", last_token=True)
+            yield tok.value
 
     def macrocall(self):
-        name = self.last_token.text[1:]
+        name = self.last_token.value[1:]
         origin = self.last_token.origin
         macro = self.definitions[name]
         arguments = list(self.consume_macrocall_arguments(len(macro.parameters)))
@@ -209,32 +136,24 @@ class VerilogAPreprocessor:
     def consume_macrocall_arguments(self, number):
         if number == 0:
             return
-        self.expect(VerilogALexer.LPAREN, "beginning of macro call argument list")
+        self.expect("LPAREN", "beginning of macro call argument list")
         for ii in range(number):
-            delimiter = (
-                VerilogALexer.COMMA if ii != number - 1 else VerilogALexer.RPAREN
-            )
+            delimiter = "COMMA" if ii != number - 1 else "RPAREN"
             argument = list(self.output_generator(end=delimiter))
             yield argument
 
     def ifdef(self):
-        name = self.expect(VerilogALexer.SIMPLE_IDENTIFIER, "ifdef").text
+        name = self.expect("SIMPLE_IDENTIFIER", "ifdef").value
         found = name in self.definitions
         # TODO: handle `elseif
         if found:
-            yield from self.output_generator(
-                end=(VerilogALexer.ENDIFDEF, VerilogALexer.ELSEDEF)
-            )
-            if self.last_token.type == VerilogALexer.ELSEDEF:
+            yield from self.output_generator(end=("ENDIFDEF", "ELSEDEF"))
+            if self.last_token.type == "ELSEDEF":
                 # Drop `else block
-                list(self.output_generator(end=VerilogALexer.ENDIFDEF))
+                list(self.output_generator(end="ENDIFDEF"))
         else:
             # Drop this block
-            list(
-                self.output_generator(
-                    end=(VerilogALexer.ENDIFDEF, VerilogALexer.ELSEDEF)
-                )
-            )
-            if self.last_token.type == VerilogALexer.ELSEDEF:
+            list(self.output_generator(end=("ENDIFDEF", "ELSEDEF")))
+            if self.last_token.type == "ELSEDEF":
                 # Preprocess `else block
-                yield from self.output_generator(end=VerilogALexer.ENDIFDEF)
+                yield from self.output_generator(end="ENDIFDEF")
