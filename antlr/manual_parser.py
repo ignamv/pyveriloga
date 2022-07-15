@@ -337,3 +337,5 @@ class Parser:
             if tok.type == "SEMICOLON":
                 break
         return variables
+
+ParseMethod = Callable[[Parser],ParseTree]

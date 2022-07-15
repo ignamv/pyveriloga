@@ -98,10 +98,11 @@ def t_error(t):
 
 lexer = ply.lex.lex()
 
+TokenSource = Iterator[MyToken]
 
 def lex(
     filename: Optional[str] = None, content: Optional[str] = None
-) -> Iterator[MyToken]:
+    ) -> TokenSource:
     if content is None:
         assert (
             filename is not None

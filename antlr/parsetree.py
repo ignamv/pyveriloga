@@ -108,6 +108,13 @@ class Variable:
     initializer: Optional[Expression]
 
 
+@dataclass
+class SourceFile:
+    natures: List[Nature]
+    disciplines: List[Discipline]
+    modules: List[Module]
+
+
 Expression = Union[Identifier, Literal, FunctionCall, Operation]
 Statement = Union[Assignment, AnalogContribution, Block]
 
@@ -129,4 +136,5 @@ ParseTree = Union[
     Block,
     If,
     Variable,
+    SourceFile,
 ]

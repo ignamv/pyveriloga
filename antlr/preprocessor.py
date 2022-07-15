@@ -1,22 +1,22 @@
 import os
 import re
-from typing import List
+from typing import List, Iterator, Dict, Optional, Union, Tuple, cast
 from dataclasses import dataclass, replace
 from itertools import takewhile, count
-from lexer import lex
-from mytoken import MyToken
-
+from lexer import lex, TokenSource
+from mytoken import MyToken, FileLocation
 
 @dataclass
 class Macro:
     parameters: List[str]
     body: List[MyToken]
 
-    def expand(self, arguments, origin):
+    def expand(self, arguments: List[List[MyToken]], origin: List[FileLocation]) -> TokenSource:
         for tok in self.body:
             tok = tok.included_from(origin)
             if tok.type == "SIMPLE_IDENTIFIER":
                 try:
+                    assert isinstance(tok.value, str)
                     idx = self.parameters.index(tok.value)
                 except ValueError:
                     pass
@@ -26,34 +26,32 @@ class Macro:
                     continue
             yield tok
 
+Definitions = Dict[str, Macro]
 
 class VerilogAPreprocessor:
-    def __init__(self, source, definitions=None):
+    def __init__(self, source: TokenSource, definitions: Optional[Definitions]=None):
         self.input_iterator = self.input_generator(source)
         self.output_iterator = self.output_generator()
         if definitions is None:
-            self.definitions = {}
+            self.definitions: Definitions = {}
         else:
             self.definitions = definitions
 
     def __iter__(self):
         return self.output_iterator
 
-    def input_generator(self, source):
+    def input_generator(self, source: TokenSource):
         for token in source:
             self.last_token = token
             yield token
 
-    def nextToken(self):
+    def nextToken(self) -> MyToken:
         return next(self.output_iterator)
-
-    def getSourceName(self):
-        return self.lexer.getSourceName()
 
     def fail(self, why):
         raise Exception(why, self.last_token)
 
-    def output_generator(self, source=None, end=None):
+    def output_generator(self, source:Optional[TokenSource]=None, end:Union[Tuple[Optional[str],...],Optional[str]]=None):
         if source is None:
             source = self.input_iterator
         if not isinstance(end, tuple):
@@ -115,8 +113,8 @@ class VerilogAPreprocessor:
             tok = self.expect("SIMPLE_IDENTIFIER", "macro parameter", last_token=True)
             yield tok.value
 
-    def macrocall(self):
-        name = self.last_token.value[1:]
+    def macrocall(self) -> TokenSource:
+        name = cast(str, self.last_token.value)[1:]
         origin = self.last_token.origin
         macro = self.definitions[name]
         arguments = list(self.consume_macrocall_arguments(len(macro.parameters)))
@@ -124,16 +122,16 @@ class VerilogAPreprocessor:
             source=macro.expand(arguments, origin), definitions=self.definitions
         )
 
-    def expect(self, type_, why, last_token=False):
+    def expect(self, type_: str, why, last_token=False):
         if not last_token:
             tok = next(self.input_iterator)
         else:
             tok = self.last_token
         if tok.type != type_:
-            self.fail("Expected " + token_code_to_name(type_) + " (" + why + ")")
+            self.fail("Expected " + type_ + " (" + why + ")")
         return tok
 
-    def consume_macrocall_arguments(self, number):
+    def consume_macrocall_arguments(self, number: int) -> Iterator[List[MyToken]]:
         if number == 0:
             return
         self.expect("LPAREN", "beginning of macro call argument list")
@@ -142,7 +140,7 @@ class VerilogAPreprocessor:
             argument = list(self.output_generator(end=delimiter))
             yield argument
 
-    def ifdef(self):
+    def ifdef(self) -> TokenSource:
         name = self.expect("SIMPLE_IDENTIFIER", "ifdef").value
         found = name in self.definitions
         # TODO: handle `elseif
@@ -157,3 +155,6 @@ class VerilogAPreprocessor:
             if self.last_token.type == "ELSEDEF":
                 # Preprocess `else block
                 yield from self.output_generator(end="ENDIFDEF")
+
+    def include(self):
+        raise NotImplementedError()

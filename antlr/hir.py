@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from verilogatypes import VAType
-from typing import Union, Optional
+from typing import Union, Optional, List
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 import parsetree as pt
@@ -19,7 +19,7 @@ class Nature(Symbol):
     # idt_nature: Nature
     units: str
     # ddt_nature: Nature = None
-    parsed: pt.Nature
+    parsed: Optional[pt.Nature] = None
 
 
 @dataclass
@@ -27,13 +27,13 @@ class Discipline(Symbol):
     domain: str
     potential: Nature
     flow: Nature
-    parsed: pt.Discipline
+    parsed: Optional[pt.Discipline] = None
 
 
 @dataclass
 class Net(Symbol):
-    discipline: Optional[Discipline]
-    parsed_net: List[pt.Net]
+    discipline: Optional[Discipline] = None
+    parsed: Optional[List[pt.Net|pt.Port]] = None
 
 
 ground = Net(name="gnd", discipline=None)
@@ -41,8 +41,7 @@ ground = Net(name="gnd", discipline=None)
 
 @dataclass
 class Port(Net):
-    direction: str = None
-    parsed_port: List[pt.Port]
+    direction: Optional[str] = None
 
 
 # class Expression(ABC):
@@ -52,17 +51,20 @@ class Port(Net):
 # raise NotImplementedError()
 
 
-@dataclass
+@dataclass(init=False)
 class Literal:
-    value: int | float
-    type: VAType
-    parsed: pt.Literal
+    value: int | float | str
+    type_: VAType
+    parsed: Optional[pt.Literal] = None
 
-    def __init__(self, value: int | float | str):
+    def __init__(self, value: int | float | str, type_: Optional[VAType]=None, parsed: Optional[pt.Literal]=None):
         self.value = value
-        self.type = {int: VAType.integer, float: VAType.real, str: VAType.string}[
-            type(value)
-        ]
+        if type_ is None:
+            type_ = {int: VAType.integer, float: VAType.real, str: VAType.string}[
+                type(value)
+            ]
+        self.type_ = type_
+        self.parsed = parsed
 
     def __repr__(self):
         return f"hir.Literal({self.value!r})"
@@ -83,7 +85,7 @@ class Function(Symbol):
 class FunctionCall:
     function: Function
     arguments: tuple[Expression]
-    parsed: pt.FunctionCall
+    parsed: Optional[pt.FunctionCall] = None
 
     @property
     def type(self):
@@ -95,7 +97,7 @@ class FunctionCall:
 class Variable(Symbol):
     type: VAType
     initializer: Expression
-    parsed: pt.Variable
+    parsed: Optional[pt.Variable] = None
 
 
 Expression = Union[Literal, FunctionCall, Variable]
@@ -105,13 +107,13 @@ Expression = Union[Literal, FunctionCall, Variable]
 class Assignment:
     lvalue: Variable
     value: Expression
-    parsed: pt.Assignment
+    parsed: Optional[pt.Assignment] = None
 
 
 @dataclass
 class Block:
     statements: List[Statement] = field(default_factory=list)
-    parsed: pt.Block
+    parsed: Optional[pt.Block] = None
 
 
 @dataclass
@@ -119,7 +121,7 @@ class If:
     condition: Expression
     then: Statement
     else_: Optional[Statement] = None
-    parsed: pt.If
+    parsed: Optional[pt.If] = None
 
 
 Statement = Union[Assignment, Block, If]
@@ -127,30 +129,31 @@ Statement = Union[Assignment, Block, If]
 
 @dataclass
 class Module(Symbol):
-    ports: [Port] = field(default_factory=list)
-    nets: [Net] = field(default_factory=list)
-    branches: [Branch] = field(default_factory=list)
-    parameters: [Variable] = field(default_factory=list)
-    statements: [Statement] = field(default_factory=list)
-    parsed: pt.Module
+    ports: List[Port] = field(default_factory=list)
+    nets: List[Net] = field(default_factory=list)
+    branches: List[Branch] = field(default_factory=list)
+    parameters: List[Variable] = field(default_factory=list)
+    statements: List[Statement] = field(default_factory=list)
+    parsed: Optional[pt.Module] = None
 
 
 @dataclass
 class SourceFile:
-    modules: [Module] = field(default_factory=list)
+    modules: List[Module] = field(default_factory=list)
+    parsed: Optional[pt.SourceFile] = None
 
 
-def ensure_type(expression, type):
-    if expression.type == type:
+def ensure_type(expression, type_):
+    if expression.type == type_:
         return expression
-    if type == VAType.integer:
+    if type_ == VAType.integer:
         assert expression.type == VAType.real
         function = cast_real_to_int
-    elif type == VAType.real:
+    elif type_ == VAType.real:
         assert expression.type == VAType.integer
         function = cast_int_to_real
     else:
-        raise Exception(type)
+        raise Exception(type_)
     return FunctionCall(function=function, arguments=(expression,))
 
 
@@ -171,3 +174,5 @@ class Branch(Symbol):
     @property
     def discipline(self):
         return self.net1.discipline
+
+HIR = Union[ Nature, Discipline, Net, Port, Literal, FunctionCall, Variable, Assignment, Block, If, Module, SourceFile, Branch]
