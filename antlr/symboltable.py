@@ -34,10 +34,3 @@ class SymbolTable:
 
     def __iter__(self) -> Iterable[Symbol]:
         return iter(self.symbols.values())
-
-
-class Scope(ABC):
-    @property
-    @abstractmethod
-    def symboltable(self) -> SymbolTable:
-        raise NotImplementedError()

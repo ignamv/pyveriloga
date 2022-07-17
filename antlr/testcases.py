@@ -1,6 +1,7 @@
 from manual_parser import Parser
 import parsetree as pt
 from lexer import tok
+from mytoken import MyToken
 
 
 def flatten(nested_list):
@@ -23,13 +24,14 @@ logicalnegation = tok.LOGICALNEGATION
 comma = tok.COMMA
 ternary = tok.TERNARY
 colon = tok.COLON
-
+temperature = MyToken(type='SYSTEM_IDENTIFIER', value='$temperature', origin=[])
 
 testcases_grouped = [
     (
         Parser.expression,
         [
             ("name", [simpleid], pt.Identifier(simpleid)),
+            ("$temperature", [temperature], pt.Identifier(temperature)),
             ("3", [three], pt.Literal(three)),
             ("3.5", [real], pt.Literal(real)),
             (
@@ -76,6 +78,11 @@ testcases_grouped = [
                 "1*2",
                 [one, times, two],
                 pt.Operation(times, [pt.Literal(one), pt.Literal(two)]),
+            ),
+            (
+                "2==3",
+                [two, tok.EQUALS, three],
+                pt.Operation(tok.EQUALS, [pt.Literal(two), pt.Literal(three)]),
             ),
             (
                 "1*2*3",

@@ -1,4 +1,5 @@
 import parsetree as pt
+from typing import Callable
 from lexer import tokens as token_types
 
 DIRECTIONS = ("INPUT", "OUTPUT", "INOUT")
@@ -36,12 +37,26 @@ class PeekIterator:
 
 unary_operators = ["MINUS", "PLUS", "LOGICALNEGATION", "BITWISENEGATION"]
 operators = {
-    "PLUS": (11, "L"),
+    "RAISED": ( 13, "L",), # ** is left-associative, confirmed with Spectre.
     "TIMES": (12, "L"),
-    "RAISED": (
-        13,
-        "L",
-    ),  # Yes, ** is left-associative in VerilogA. Confirmed with Spectre.
+    "DIVIDED": (12, "L"),
+    "MODULUS": (12, "L"),
+    "PLUS": (11, "L"),
+    "MINUS": (11, "L"),
+    "LOGICRIGHTSHIFT": (10, "L"),
+    "LOGICLEFTSHIFT": (10, "L"),
+    "GREATEROREQUAL": (9, "L"),
+    "GREATER": (9, "L"),
+    "SMALLER": (9, "L"),
+    "SMALLEROREQUAL": (9, "L"),
+    "NOTEQUAL": (8, "L"),
+    "EQUALS": (8, "L"),
+    "BITWISEAND": (7, "L"),
+    "XOROP": (6, "L"),
+    "XNOROP": (6, "L"),
+    "BITWISEOR": (5, "L"),
+    "LOGICALAND": (4, "L"),
+    "LOGICALOR": (3, "L"),
     "TERNARY": (2, "R"),
 }
 
@@ -110,7 +125,7 @@ class Parser:
             return ret
         if tok.type in ("REAL_NUMBER", "UNSIGNED_NUMBER", "STRING_LITERAL"):
             return pt.Literal(tok)
-        if tok.type == "SIMPLE_IDENTIFIER":
+        if tok.type in ("SIMPLE_IDENTIFIER", 'SYSTEM_IDENTIFIER'):
             id_ = pt.Identifier(tok)
             if self.eof() or self.peek_type() != "LPAREN":
                 return id_
@@ -338,4 +353,4 @@ class Parser:
                 break
         return variables
 
-ParseMethod = Callable[[Parser],ParseTree]
+ParseMethod = Callable[[Parser],pt.ParseTree]

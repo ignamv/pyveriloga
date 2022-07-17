@@ -1,6 +1,6 @@
 import os
 import re
-from typing import List, Iterator, Dict, Optional, Union, Tuple, cast
+from typing import List, Iterator, Mapping, Optional, Union, Tuple, cast
 from dataclasses import dataclass, replace
 from itertools import takewhile, count
 from lexer import lex, TokenSource
@@ -26,7 +26,7 @@ class Macro:
                     continue
             yield tok
 
-Definitions = Dict[str, Macro]
+Definitions = Mapping[str, Macro]
 
 class VerilogAPreprocessor:
     def __init__(self, source: TokenSource, definitions: Optional[Definitions]=None):
@@ -74,7 +74,7 @@ class VerilogAPreprocessor:
                 self.fail("Unexpected `else")
             elif token.type == "ENDIFDEF":
                 self.fail("Unexpected `endif")
-            elif token.type == "INCLUDE":
+            elif token.type == "PPINCLUDE":
                 yield from self.include()
             elif token.type == "MACROCALL":
                 yield from self.macrocall()

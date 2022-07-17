@@ -56,11 +56,11 @@ expr_vars = {
         (
             "1+2*3",
             hir.FunctionCall(
-                builtins["builtin.integer_addition"],
+                builtins.integer_addition,
                 (
                     hir.Literal(1),
                     hir.FunctionCall(
-                        builtins["builtin.integer_product"],
+                        builtins.integer_product,
                         (hir.Literal(2), hir.Literal(3)),
                     ),
                 ),
@@ -69,11 +69,11 @@ expr_vars = {
         (
             "1*(2+3)",
             hir.FunctionCall(
-                builtins["builtin.integer_product"],
+                builtins.integer_product,
                 (
                     hir.Literal(1),
                     hir.FunctionCall(
-                        builtins["builtin.integer_addition"],
+                        builtins.integer_addition,
                         (hir.Literal(2), hir.Literal(3)),
                     ),
                 ),
@@ -82,10 +82,10 @@ expr_vars = {
         (
             "1*2+3",
             hir.FunctionCall(
-                builtins["builtin.integer_addition"],
+                builtins.integer_addition,
                 (
                     hir.FunctionCall(
-                        builtins["builtin.integer_product"],
+                        builtins.integer_product,
                         (hir.Literal(1), hir.Literal(2)),
                     ),
                     hir.Literal(3),
@@ -97,17 +97,17 @@ expr_vars = {
         (
             "int1+3",
             hir.FunctionCall(
-                builtins["builtin.integer_addition"],
+                builtins.integer_addition,
                 arguments=(expr_vars["int1"], hir.Literal(3)),
             ),
         ),
         (
             "int1+3.5",
             hir.FunctionCall(
-                builtins["builtin.real_addition"],
+                builtins.real_addition,
                 arguments=(
                     hir.FunctionCall(
-                        builtins["builtin.cast_int_to_real"], (expr_vars["int1"],)
+                        builtins.cast_int_to_real, (expr_vars["int1"],)
                     ),
                     hir.Literal(3.5),
                 ),
@@ -116,16 +116,16 @@ expr_vars = {
         (
             "2 == 3",
             hir.FunctionCall(
-                builtins["builtin.integer_equality"], (hir.Literal(2), hir.Literal(3))
+                builtins.integer_equality, (hir.Literal(2), hir.Literal(3))
             ),
         ),
         (
             "2 != 3.0",
             hir.FunctionCall(
-                builtins["builtin.real_inequality"],
+                builtins.real_inequality,
                 (
                     hir.FunctionCall(
-                        builtins["builtin.cast_int_to_real"], (hir.Literal(2),)
+                        builtins.cast_int_to_real, (hir.Literal(2),)
                     ),
                     hir.Literal(3.0),
                 ),
@@ -156,7 +156,7 @@ def test_parser_expr(exprsource, expected):
             hir.Assignment(
                 lvalue=expr_vars["real1"],
                 value=hir.FunctionCall(
-                    builtins["builtin.cast_int_to_real"], (hir.Literal(3),)
+                    builtins.cast_int_to_real, (hir.Literal(3),)
                 ),
             ),
         ),
@@ -230,7 +230,7 @@ endmodule
                             name="real3", type=VAType.real, initializer=None
                         ),
                         value=hir.FunctionCall(
-                            function=builtins["builtin.real_addition"],
+                            function=builtins.real_addition,
                             arguments=(
                                 hir.Variable(
                                     name="real1", type=VAType.real, initializer=None

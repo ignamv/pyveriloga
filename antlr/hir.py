@@ -78,7 +78,7 @@ class FunctionSignature:
 
 @dataclass(eq=False)
 class Function(Symbol):
-    type: FunctionSignature
+    type_: FunctionSignature
 
 
 @dataclass
@@ -88,14 +88,14 @@ class FunctionCall:
     parsed: Optional[pt.FunctionCall] = None
 
     @property
-    def type(self):
+    def type_(self):
         # Get result type from function signature
-        return self.function.type.returntype
+        return self.function.type_.returntype
 
 
 @dataclass
 class Variable(Symbol):
-    type: VAType
+    type_: VAType
     initializer: Expression
     parsed: Optional[pt.Variable] = None
 
@@ -141,20 +141,6 @@ class Module(Symbol):
 class SourceFile:
     modules: List[Module] = field(default_factory=list)
     parsed: Optional[pt.SourceFile] = None
-
-
-def ensure_type(expression, type_):
-    if expression.type == type_:
-        return expression
-    if type_ == VAType.integer:
-        assert expression.type == VAType.real
-        function = cast_real_to_int
-    elif type_ == VAType.real:
-        assert expression.type == VAType.integer
-        function = cast_int_to_real
-    else:
-        raise Exception(type_)
-    return FunctionCall(function=function, arguments=(expression,))
 
 
 @dataclass

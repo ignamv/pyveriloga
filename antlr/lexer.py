@@ -27,7 +27,7 @@ tokens = (
         "IFDEF",
         "ELSEDEF",
         "ENDIFDEF",
-        "INCLUDE",
+        "PPINCLUDE",
         "MACROCALL",
         "NEWLINE",
     )

@@ -15,42 +15,52 @@ builtins_list = [
     for symbol in [
         Function(
             name="cast_int_to_real",
-            type=FunctionSignature(returntype=VAType.real, parameters=[VAType.integer]),
+            type_=FunctionSignature(returntype=VAType.real, parameters=[VAType.integer]),
         ),
         Function(
             "cast_real_to_int",
-            type=FunctionSignature(returntype=VAType.integer, parameters=[VAType.real]),
+            type_=FunctionSignature(returntype=VAType.integer, parameters=[VAType.real]),
         ),
-        Function(name="integer_product", type=binary_int_type),
-        Function(name="real_product", type=binary_real_type),
-        Function(name="integer_addition", type=binary_int_type),
-        Function(name="real_addition", type=binary_real_type),
-        Function(name="integer_division", type=binary_int_type),
-        Function(name="real_division", type=binary_real_type),
-        Function(name="integer_subtraction", type=binary_int_type),
-        Function(name="real_subtraction", type=binary_real_type),
+        Function(name="integer_product", type_=binary_int_type),
+        Function(name="real_product", type_=binary_real_type),
+        Function(name="integer_addition", type_=binary_int_type),
+        Function(name="real_addition", type_=binary_real_type),
+        Function(name="integer_division", type_=binary_int_type),
+        Function(name="real_division", type_=binary_real_type),
+        Function(name="integer_subtraction", type_=binary_int_type),
+        Function(name="real_subtraction", type_=binary_real_type),
         Function(
             name="real_equality",
-            type=FunctionSignature(
+            type_=FunctionSignature(
                 returntype=VAType.integer, parameters=[VAType.real, VAType.real]
             ),
         ),
         Function(
             name="real_inequality",
-            type=FunctionSignature(
+            type_=FunctionSignature(
                 returntype=VAType.integer, parameters=[VAType.real, VAType.real]
             ),
         ),
-        Function(name="integer_equality", type=binary_int_type),
-        Function(name="integer_inequality", type=binary_int_type),
+        Function(name="integer_equality", type_=binary_int_type),
+        Function(name="integer_inequality", type_=binary_int_type),
     ]
 ]
 builtins_list.extend(
     [
-        Function(name="sin", type=unary_real_type),
-        Function(name="pow", type=binary_real_type),
-        Variable(name="$temperature", type=VAType.real, initializer=Literal(25)),
+        Function(name="sin", type_=unary_real_type),
+        Function(name="pow", type_=binary_real_type),
+        Variable(name="$temperature", type_=VAType.real, initializer=Literal(25)),
     ]
 )
 
-builtins = {symbol.name: symbol for symbol in builtins_list}
+
+class Builtins:
+    def __init__(self):
+        self.symbols = {symbol.name: symbol for symbol in builtins_list}
+        # Shortcut to common builtins
+        for symbol in builtins_list:
+            setattr(self, symbol.name.rpartition('.')[2], symbol)
+
+    def __getitem__(self, name):
+        return self.symbols[name]
+builtins = Builtins()
