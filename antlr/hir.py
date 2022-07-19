@@ -7,12 +7,12 @@ from collections import OrderedDict
 import parsetree as pt
 
 
-@dataclass
+@dataclass(frozen=True)
 class Symbol:
     name: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class Nature(Symbol):
     abstol: float
     access: str
@@ -22,7 +22,7 @@ class Nature(Symbol):
     parsed: Optional[pt.Nature] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class Discipline(Symbol):
     domain: str
     potential: Nature
@@ -30,7 +30,7 @@ class Discipline(Symbol):
     parsed: Optional[pt.Discipline] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class Net(Symbol):
     discipline: Optional[Discipline] = None
     parsed: Optional[List[pt.Net|pt.Port]] = None
@@ -39,7 +39,7 @@ class Net(Symbol):
 ground = Net(name="gnd", discipline=None)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Port(Net):
     direction: Optional[str] = None
 
@@ -70,18 +70,18 @@ class Literal:
         return f"hir.Literal({self.value!r})"
 
 
-@dataclass
+@dataclass(frozen=True)
 class FunctionSignature:
     returntype: VAType
-    parameters: List[VAType]
+    parameters: Tuple[VAType,...]
 
 
-@dataclass(eq=False)
+@dataclass(frozen=True)
 class Function(Symbol):
     type_: FunctionSignature
 
 
-@dataclass
+@dataclass(frozen=True)
 class FunctionCall:
     function: Function
     arguments: tuple[Expression]
@@ -93,7 +93,7 @@ class FunctionCall:
         return self.function.type_.returntype
 
 
-@dataclass
+@dataclass(frozen=True)
 class Variable(Symbol):
     type_: VAType
     initializer: Expression
@@ -103,20 +103,20 @@ class Variable(Symbol):
 Expression = Union[Literal, FunctionCall, Variable]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Assignment:
     lvalue: Variable
     value: Expression
     parsed: Optional[pt.Assignment] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class Block:
     statements: List[Statement] = field(default_factory=list)
     parsed: Optional[pt.Block] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class If:
     condition: Expression
     then: Statement
@@ -127,7 +127,7 @@ class If:
 Statement = Union[Assignment, Block, If]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Module(Symbol):
     ports: List[Port] = field(default_factory=list)
     nets: List[Net] = field(default_factory=list)
@@ -137,13 +137,13 @@ class Module(Symbol):
     parsed: Optional[pt.Module] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class SourceFile:
     modules: List[Module] = field(default_factory=list)
     parsed: Optional[pt.SourceFile] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class Accessor(Symbol):
     nature: Nature
 
@@ -152,7 +152,7 @@ class Accessor(Symbol):
         self.nature = nature
 
 
-@dataclass
+@dataclass(frozen=True)
 class Branch(Symbol):
     net1: Net
     net2: Net

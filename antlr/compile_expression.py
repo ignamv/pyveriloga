@@ -13,7 +13,7 @@ def expression_to_pythonfunc(expression):
 
     # Run the function via ctypes
     cfunctype = vatype_to_ctype(
-        hir.FunctionSignature(returntype=expression.type, parameters=[])
+        hir.FunctionSignature(returntype=expression.type_, parameters=[])
     )
     cfunc = cfunctype(func_ptr)
     return cfunc

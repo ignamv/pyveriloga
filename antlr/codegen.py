@@ -2,6 +2,7 @@ from verilogatypes import VAType
 from llvmlite import ir
 from functools import singledispatchmethod, partial
 import hir
+from vabuiltins import builtins
 from customdict import CustomDict
 
 
@@ -35,11 +36,11 @@ class CodegenContext:
     def declare_builtins(self):
         # Declare LLVM intrinsics as extern
         intrinsic_names = {
-            hir.sin: "llvm.sin.f64",
-            hir.pow_: "llvm.pow.f64",
+            builtins.sin: "llvm.sin.f64",
+            builtins.pow: "llvm.pow.f64",
         }
         for vafunc, name in intrinsic_names.items():
-            functype = vatype_to_llvmtype(vafunc.type)
+            functype = vatype_to_llvmtype(vafunc.type_)
             llvmfunc = ir.Function(self.irmodule, functype, name=name)
             self.compiled[vafunc] = llvmfunc
 
@@ -47,7 +48,7 @@ class CodegenContext:
     def expression_to_llvm_module_ir(cls, expression, funcname):
         codegen = cls()
         codegen.declare_builtins()
-        functype = ir.FunctionType(vatype_to_llvmtype(expression.type), ())
+        functype = ir.FunctionType(vatype_to_llvmtype(expression.type_), ())
         func = ir.Function(codegen.irmodule, functype, name=funcname)
         block = func.append_basic_block(name="entry")
         codegen.builder = ir.IRBuilder(block)
@@ -60,31 +61,31 @@ class CodegenContext:
 
     @expression_to_ir.register
     def _(self, literal: hir.Literal):
-        return ir.Constant(vatype_to_llvmtype(literal.type), literal.value)
+        return ir.Constant(vatype_to_llvmtype(literal.type_), literal.value)
 
     @expression_to_ir.register
     def _(self, funcall: hir.FunctionCall):
         func = funcall.function
         args = [self.expression_to_ir(arg) for arg in funcall.arguments]
         instructions = {
-            hir.integer_addition: self.builder.add,
-            hir.integer_subtraction: self.builder.sub,
-            hir.integer_product: self.builder.mul,
-            hir.integer_division: self.builder.sdiv,
-            hir.real_addition: self.builder.fadd,
-            hir.real_subtraction: self.builder.fsub,
-            hir.real_product: self.builder.fmul,
-            hir.real_division: self.builder.fdiv,
-            hir.cast_int_to_real: partial(self.builder.sitofp, typ=llvmreal),
-            hir.cast_real_to_int: partial(self.builder.fptosi, typ=llvmint),
+            builtins.integer_addition: self.builder.add,
+            builtins.integer_subtraction: self.builder.sub,
+            builtins.integer_product: self.builder.mul,
+            builtins.integer_division: self.builder.sdiv,
+            builtins.real_addition: self.builder.fadd,
+            builtins.real_subtraction: self.builder.fsub,
+            builtins.real_product: self.builder.fmul,
+            builtins.real_division: self.builder.fdiv,
+            builtins.cast_int_to_real: partial(self.builder.sitofp, typ=llvmreal),
+            builtins.cast_real_to_int: partial(self.builder.fptosi, typ=llvmint),
         }
         if func in instructions:
             return instructions[func](*args)
         logical_instructions = {
-            hir.integer_equality: partial(self.builder.icmp_signed, cmpop="=="),
-            hir.integer_inequality: partial(self.builder.icmp_signed, cmpop="!="),
-            hir.real_equality: partial(self.builder.fcmp_ordered, cmpop="=="),
-            hir.real_inequality: partial(self.builder.fcmp_ordered, cmpop="!="),
+            builtins.integer_equality: partial(self.builder.icmp_signed, cmpop="=="),
+            builtins.integer_inequality: partial(self.builder.icmp_signed, cmpop="!="),
+            builtins.real_equality: partial(self.builder.fcmp_ordered, cmpop="=="),
+            builtins.real_inequality: partial(self.builder.fcmp_ordered, cmpop="!="),
         }
         if func in logical_instructions:
             i1_result = logical_instructions[func](lhs=args[0], rhs=args[1])
@@ -115,9 +116,9 @@ class CodegenContext:
     def variable_to_ir(self, variable):
         if variable not in self.compiled:
             irvar = ir.GlobalVariable(
-                self.irmodule, vatype_to_llvmtype(variable.type), variable.name
+                self.irmodule, vatype_to_llvmtype(variable.type_), variable.name
             )
-            irvar.initializer = ir.Constant(vatype_to_llvmtype(variable.type), 0)
+            irvar.initializer = ir.Constant(vatype_to_llvmtype(variable.type_), 0)
             self.compiled[variable] = irvar
         return self.compiled[variable]
 
@@ -139,10 +140,10 @@ class CodegenContext:
     @statement_to_ir.register
     def _(self, if_: hir.If):
         inequality = {
-            VAType.integer: hir.integer_inequality,
-            VAType.real: hir.real_inequality,
-        }[if_.condition.type]
-        zero = hir.Literal({VAType.integer: 0, VAType.real: 0.0}[if_.condition.type])
+            VAType.integer: builtins.integer_inequality,
+            VAType.real: builtins.real_inequality,
+        }[if_.condition.type_]
+        zero = hir.Literal({VAType.integer: 0, VAType.real: 0.0}[if_.condition.type_])
         condition_hir = hir.FunctionCall(inequality, (if_.condition, zero))
         condition_ir = self.builder.trunc(self.expression_to_ir(condition_hir), llvmi1)
         with self.builder.if_else(condition_ir) as (then, otherwise):

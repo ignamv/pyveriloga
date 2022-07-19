@@ -3,6 +3,7 @@ from ctypes import c_int, pointer
 from unittest.mock import MagicMock
 from codegen import CodegenContext, vatype_to_llvmtype
 from llvmlite import ir
+from vabuiltins import builtins
 from verilogatypes import VAType
 import hir
 
@@ -13,9 +14,9 @@ def test_from_hir_mocking_module_to_llvm_module_ir(monkeypatch):
     func = ir.Function(codegen.irmodule, functype, name="run_analog")
     vars_ = {}
     for ii in range(1, 4):
-        hirvar = hir.Variable(name="real" + str(ii), type=VAType.real, initializer=None)
+        hirvar = hir.Variable(name="real" + str(ii), type_=VAType.real, initializer=None)
         compiledvar = ir.GlobalVariable(
-            codegen.irmodule, vatype_to_llvmtype(hirvar.type), hirvar.name
+            codegen.irmodule, vatype_to_llvmtype(hirvar.type_), hirvar.name
         )
         compiledvar.initializer = ir.Constant(vatype_to_llvmtype(VAType.real), 0)
         vars_[ii] = codegen.compiled[hirvar] = compiledvar
@@ -59,9 +60,9 @@ def test_compiled_module():
     run_analog.assert_called_once_with()
 
 
-real1 = hir.Variable(name="real1", type=VAType.real, initializer=None)
-real2 = hir.Variable(name="real2", type=VAType.real, initializer=None)
-real3 = hir.Variable(name="real3", type=VAType.real, initializer=None)
+real1 = hir.Variable(name="real1", type_=VAType.real, initializer=None)
+real2 = hir.Variable(name="real2", type_=VAType.real, initializer=None)
+real3 = hir.Variable(name="real3", type_=VAType.real, initializer=None)
 
 
 def test_from_hir_addition():
@@ -71,7 +72,7 @@ def test_from_hir_addition():
             hir.Assignment(
                 lvalue=real3,
                 value=hir.FunctionCall(
-                    function=hir.real_addition, arguments=(real1, real2)
+                    function=builtins.real_addition, arguments=(real1, real2)
                 ),
             )
         ],
@@ -96,13 +97,13 @@ def test_from_hir_block():
                     hir.Assignment(
                         lvalue=real3,
                         value=hir.FunctionCall(
-                            function=hir.real_addition, arguments=(real1, real2)
+                            function=builtins.real_addition, arguments=(real1, real2)
                         ),
                     ),
                     hir.Assignment(
                         lvalue=real2,
                         value=hir.FunctionCall(
-                            function=hir.real_addition, arguments=(real1, real3)
+                            function=builtins.real_addition, arguments=(real1, real3)
                         ),
                     ),
                 ]
