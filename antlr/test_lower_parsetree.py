@@ -84,10 +84,11 @@ syms = {
     ("int1+3.5", hir.FunctionCall( builtins.real_addition, arguments=( hir.FunctionCall( builtins.cast_int_to_real, (syms["int1"],)), hir.Literal(3.5)))),
     ("2 == 3", hir.FunctionCall( builtins.integer_equality, (hir.Literal(2), hir.Literal(3)))),
     ("2 != 3.0", hir.FunctionCall( builtins.real_inequality, ( hir.FunctionCall( builtins.cast_int_to_real, (hir.Literal(2),)), hir.Literal(3.0)))),
-    ("2 + $temperature", builtins["$temperature"]),
+    ("$temperature", builtins["$temperature"]),
 ])
 def test_lower_parsetree(source: str, expected: hir.HIR):
-    context = [(hir.SourceFile(), SymbolTable(syms.values()))]
+    symbols = list(syms.values()) + list(builtins.symbols.values())
+    context = [(hir.SourceFile(), SymbolTable(symbols))]
     tokens = list(VerilogAPreprocessor(lex(content=source)))
     parser = Parser(tokens)
     parsetree = parser.expression()
