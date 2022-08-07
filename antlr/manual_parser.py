@@ -5,6 +5,7 @@ from lexer import tokens as token_types
 DIRECTIONS = ("INPUT", "OUTPUT", "INOUT")
 VARTYPES = ("REAL", "INTEGER", "STRING")
 NATUREATTRS = ("UNITS", "ACCESS", "IDT_NATURE", "DDT_NATURE", "ABSTOL")
+BUILTIN_FUNCTIONS = ('LN','LOG','EXP','SQRT','MIN','MAX','ABS','POW','FLOOR','CEIL','SIN','COS','TAN','ASIN','ACOS','ATAN','ATAN2','HYPOT','SINH','COSH','TANH','ASINH','ACOSH','ATANH')
 
 
 class PeekIterator:
@@ -125,7 +126,7 @@ class Parser:
             return ret
         if tok.type in ("REAL_NUMBER", "UNSIGNED_NUMBER", "STRING_LITERAL"):
             return pt.Literal(tok)
-        if tok.type in ("SIMPLE_IDENTIFIER", 'SYSTEM_IDENTIFIER'):
+        if tok.type in ("SIMPLE_IDENTIFIER", 'SYSTEM_IDENTIFIER') + BUILTIN_FUNCTIONS:
             id_ = pt.Identifier(tok)
             if self.eof() or self.peek_type() != "LPAREN":
                 return id_
@@ -176,7 +177,7 @@ class Parser:
         if key.type == "DOMAIN":
             value = self.expect_type("DISCRETE")
         else:
-            value = pt.Identifier(self.expect_type("SIMPLE_IDENTIFIER"))
+            value = self.expect_type("SIMPLE_IDENTIFIER")
         self.expect_type("SEMICOLON")
         return pt.DisciplineAttribute(key, value)
 
@@ -189,6 +190,7 @@ class Parser:
             ports = []
             nets = []
         variables = []
+        statements = []
         self.expect_type("SEMICOLON")
         while True:
             type_ = self.peek_type()
@@ -202,11 +204,14 @@ class Parser:
                 ports.extend(new_ports)
             elif type_ in VARTYPES:
                 variables.extend(self.variable_declaration())
+            elif type_ == 'ANALOG':
+                self.next()
+                statements.append(self.statement())
             else:
                 self.next()
                 self.fail("Invalid module item")
         self.next()
-        return pt.Module(name=name, nets=nets, ports=ports, variables=variables)
+        return pt.Module(name=name, nets=nets, ports=ports, variables=variables, statements=statements)
 
     def list_of_ports(self):
         self.expect_type("LPAREN")
@@ -218,7 +223,7 @@ class Parser:
             if type_ == "RPAREN":
                 break
             elif type_ == "SIMPLE_IDENTIFIER":
-                ports.append(name=tok1, direction=None)
+                ports.append(pt.Port(name=tok1, direction=None))
             elif type_ in DIRECTIONS:
                 direction = tok1
                 name_or_discipline = self.expect_type("SIMPLE_IDENTIFIER")
@@ -353,4 +358,20 @@ class Parser:
                 break
         return variables
 
+    def sourcefile(self):
+        sourcefile = pt.SourceFile()
+        while True:
+            try:
+                tok = self.peek()
+            except StopIteration:
+                break
+            if tok.type == 'MODULE':
+                sourcefile.modules.append(self.module())
+            elif tok.type == 'NATURE':
+                sourcefile.natures.append(self.nature())
+            elif tok.type == 'DISCIPLINE':
+                sourcefile.disciplines.append(self.discipline())
+            else:
+                break
+        return sourcefile
 ParseMethod = Callable[[Parser],pt.ParseTree]

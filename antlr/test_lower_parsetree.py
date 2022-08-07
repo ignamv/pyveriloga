@@ -11,6 +11,33 @@ from vabuiltins import builtins
 from symboltable import SymbolTable
 from functools import singledispatch
 
+DISCIPLINES = """
+nature Current; 
+  units        = "A";
+  access       = I;
+  idt_nature   = Charge;
+  abstol       = 1e-12;
+endnature 
+
+nature Voltage; 
+  units      = "V";
+  access     = V;
+  abstol     = 1e-6;
+endnature 
+
+nature Charge; 
+  units      = "coul";
+  access     = Q;
+  ddt_nature = Current;
+  abstol     = 1e-14;
+endnature
+
+discipline electrical; 
+  potential    Voltage;
+  flow         Current;
+enddiscipline
+"""
+
 @singledispatch
 def strip_parsed(node: hir.HIR) -> hir.HIR:
     """Set `parsed` field to None recursively to make test cases more concise"""
@@ -30,7 +57,7 @@ def _(node: hir.FunctionCall):
 
 @strip_parsed.register
 def _(node: hir.Variable):
-    return replace(node, parsed=None, initializer=strip_parsed(node.initializer))
+    return replace(node, parsed=None, initializer=strip_parsed(node.initializer) if node.initializer is not None else None)
 
 @strip_parsed.register
 def _(node: hir.Assignment):
@@ -61,6 +88,17 @@ def _(node: hir.SourceFile):
     return replace(node, parsed=None, 
             modules=list(map(strip_parsed, node.modules)))
 
+@strip_parsed.register
+def _(module: hir.Module):
+    return replace(module, parsed=None,
+            ports=list(map(strip_parsed, module.ports)),
+            nets=list(map(strip_parsed, module.nets)),
+            branches=list(map(strip_parsed, module.branches)),
+            parameters=list(map(strip_parsed, module.parameters)),
+            variables=list(map(strip_parsed, module.variables)),
+            statements=list(map(strip_parsed, module.statements)),
+            )
+
 syms = {
     var.name: var
     for var in (
@@ -85,8 +123,9 @@ syms = {
     ("2 == 3", hir.FunctionCall( builtins.integer_equality, (hir.Literal(2), hir.Literal(3)))),
     ("2 != 3.0", hir.FunctionCall( builtins.real_inequality, ( hir.FunctionCall( builtins.cast_int_to_real, (hir.Literal(2),)), hir.Literal(3.0)))),
     ("$temperature", builtins["$temperature"]),
+    ("pow(2, 3.0)", hir.FunctionCall(builtins.pow, (hir.FunctionCall(builtins.cast_int_to_real, (hir.Literal(2),)), hir.Literal(3.0)))),
 ])
-def test_lower_parsetree(source: str, expected: hir.HIR):
+def test_lower_parsetree_expression(source: str, expected: hir.HIR):
     symbols = list(syms.values()) + list(builtins.symbols.values())
     context = [(hir.SourceFile(), SymbolTable(symbols))]
     tokens = list(VerilogAPreprocessor(lex(content=source)))
@@ -95,3 +134,66 @@ def test_lower_parsetree(source: str, expected: hir.HIR):
     assert not list(parser.peekiterator), 'Not all input was consumed'
     actual = strip_parsed(LowerParseTree(context).lower(parsetree))
     assert actual == expected
+
+def test_lower_parsetree_disciplines():
+    source = DISCIPLINES + '''
+module mymod(p1);
+inout electrical p1;
+endmodule
+'''
+    expected = 3
+    tokens = list(VerilogAPreprocessor(lex(content=source)))
+    parser = Parser(tokens)
+    parsetree = parser.sourcefile()
+    assert not list(parser.peekiterator), 'Not all input was consumed'
+    contexts = [(hir.SourceFile(), SymbolTable(builtins.symbols.values()))]
+    lowerer = LowerParseTree(contexts=contexts)
+    sourcefile = strip_parsed(lowerer.lower(parsetree))
+    discipline = sourcefile.modules[0].nets[0].discipline
+    assert discipline.name == 'electrical'
+    assert discipline.potential.name == 'Voltage'
+    assert discipline.potential.abstol == 1e-6
+    assert discipline.flow.name == 'Current'
+    assert discipline.flow.abstol == 1e-12
+    assert discipline.flow.idt_nature.name == 'Charge'
+
+def test_lower_parsetree_sourcefile():
+    source = DISCIPLINES + '''
+module mymod(p1, p2);
+inout electrical p1, p2;
+real real1, real2=4.5;
+integer int1=4, int2;
+analog int1 = real2 * int2
+endmodule
+'''
+    expected = 3
+    tokens = list(VerilogAPreprocessor(lex(content=source)))
+    parser = Parser(tokens)
+    parsetree = parser.sourcefile()
+    assert not list(parser.peekiterator), 'Not all input was consumed'
+    contexts = [(None, SymbolTable(builtins.symbols.values()))]
+    sourcefile = strip_parsed(LowerParseTree(contexts=contexts).lower(parsetree))
+    electrical = sourcefile.modules[0].nets[0].discipline
+    real1 = hir.Variable(name='real1', type_=VAType.real, initializer=None)
+    real2 = hir.Variable(name='real2', type_=VAType.real, initializer=hir.Literal(4.5))
+    int1 = hir.Variable(name='int1', type_=VAType.integer, initializer=hir.Literal(4))
+    int2 = hir.Variable(name='int2', type_=VAType.integer, initializer=None)
+    expected_module = hir.Module(
+        name='mymod',
+        nets=[
+            hir.Net(name='p1', discipline=electrical),
+            hir.Net(name='p2', discipline=electrical),
+        ],
+        ports=[
+            hir.Port(name='p1', direction='inout'),
+            hir.Port(name='p2', direction='inout'),
+        ],
+        variables=[real1, real2, int1, int2],
+        statements=[
+            hir.Assignment(lvalue=int1, value=hir.FunctionCall(function=builtins.real_product, arguments=(
+                real2, hir.FunctionCall(function=builtins.cast_int_to_real, arguments=(int2,))
+            ))),
+        ],
+    )
+    assert len(sourcefile.modules) == 1
+    assert sourcefile.modules[0] == expected_module

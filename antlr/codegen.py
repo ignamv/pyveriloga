@@ -36,10 +36,10 @@ class CodegenContext:
     def declare_builtins(self):
         # Declare LLVM intrinsics as extern
         intrinsic_names = {
-            builtins.sin: "llvm.sin.f64",
-            builtins.pow: "llvm.pow.f64",
+            "llvm.sin.f64": builtins.sin,
+            "llvm.pow.f64": builtins.pow,
         }
-        for vafunc, name in intrinsic_names.items():
+        for name, vafunc in intrinsic_names.items():
             functype = vatype_to_llvmtype(vafunc.type_)
             llvmfunc = ir.Function(self.irmodule, functype, name=name)
             self.compiled[vafunc] = llvmfunc

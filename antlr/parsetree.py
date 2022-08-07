@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Union, Optional
 from mytoken import MyToken
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -11,7 +11,7 @@ class Identifier:
 
 @dataclass
 class FunctionCall:
-    function: Identifier
+    function: MyToken
     args: List[Expression]
 
 
@@ -28,7 +28,7 @@ class Operation:
 
 @dataclass
 class Nature:
-    name: Identifier
+    name: MyToken
     attributes: List[NatureAttribute]
 
 
@@ -40,19 +40,14 @@ class NatureAttribute:
 
 @dataclass
 class Discipline:
-    name: Identifier
+    name: MyToken
     attributes: List[DisciplineAttribute]
-
-
-@dataclass
-class DiscreteOrContinuous:
-    value: MyToken
 
 
 @dataclass
 class DisciplineAttribute:
     name: MyToken
-    value: Identifier | DiscreteOrContinuous
+    value: MyToken
 
 
 @dataclass
@@ -64,15 +59,16 @@ class Port:
 @dataclass
 class Net:
     name: MyToken
-    discipline: Identifier
+    discipline: MyToken
 
 
 @dataclass
 class Module:
     name: MyToken
-    ports: List[Port]
-    nets: List[Net]
-    variables: List[Variable]
+    ports: List[Port] = field(default_factory=list)
+    nets: List[Net] = field(default_factory=list)
+    variables: List[Variable] = field(default_factory=list)
+    statements: List[Statement] = field(default_factory=list)
 
 
 @dataclass
@@ -110,9 +106,9 @@ class Variable:
 
 @dataclass
 class SourceFile:
-    natures: List[Nature]
-    disciplines: List[Discipline]
-    modules: List[Module]
+    natures: List[Nature] = field(default_factory=list)
+    disciplines: List[Discipline] = field(default_factory=list)
+    modules: List[Module] = field(default_factory=list)
 
 
 Expression = Union[Identifier, Literal, FunctionCall, Operation]
@@ -126,7 +122,6 @@ ParseTree = Union[
     Nature,
     NatureAttribute,
     Discipline,
-    DiscreteOrContinuous,
     DisciplineAttribute,
     Port,
     Net,

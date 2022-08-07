@@ -1,10 +1,12 @@
-from typing import List, Callable
+from typing import List, Callable, Optional
 import pytest
 from manual_parser import PeekIterator, Parser
 from mytoken import MyToken
 import parsetree as pt
-from lexer import reserved, operators, tok
+from lexer import reserved, operators, tok, lex
+from preprocessor import VerilogAPreprocessor
 from testcases import testcases, flatten
+from dataclasses import replace
 
 
 def test_peek():
@@ -34,15 +36,15 @@ def test_peek():
     assert iterator.eof()
 
 
-@pytest.mark.parametrize(
-    "tokens,method,expected",
-    [(tokens, method, expected) for _, tokens, method, expected in testcases],
-)
+@pytest.mark.parametrize( "source,tokens,method,expected", testcases)
 def test_parser(
-    tokens: List[MyToken],
+    source: str,
+    tokens: Optional[List[MyToken]],
     method: Callable[[Parser, List[MyToken]], pt.ParseTree],
     expected: pt.ParseTree,
 ):
+    if tokens is None:
+        tokens = [replace(tok, origin=[]) for tok in VerilogAPreprocessor(lex(content=source))]
     guard = [tok.guard]
     parser = Parser(tokens + guard)
     result = method(parser)

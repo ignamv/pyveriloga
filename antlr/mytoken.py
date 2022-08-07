@@ -21,3 +21,7 @@ class MyToken:
             for f, line, column in self.origin
         ]
         return f"MyToken({self.type}, {self.value!r}, {origin!r})"
+
+    def strip_origin(self):
+        """Return copy of self without origin"""
+        return replace(self, origin=[])

@@ -52,6 +52,14 @@ testcases_grouped = [
                     [pt.Identifier(simpleid1), pt.Literal(three)],
                 ),
             ),
+            (
+                "pow(arg1, 3)",
+                [tok.POW, lparen, simpleid1, comma, three, rparen],
+                pt.FunctionCall(
+                    pt.Identifier(tok.POW),
+                    [pt.Identifier(simpleid1), pt.Literal(three)],
+                ),
+            ),
             ("-3", [minus, three], pt.Operation(minus, [pt.Literal(value=three)])),
             (
                 "!(3.5)",
@@ -260,11 +268,11 @@ testcases_grouped = [
                         ),
                         pt.DisciplineAttribute(
                             tok.POTENTIAL,
-                            pt.Identifier(tok.Voltage),
+                            tok.Voltage,
                         ),
                         pt.DisciplineAttribute(
                             tok.FLOW,
-                            pt.Identifier(tok.Current),
+                            tok.Current,
                         ),
                     ],
                 ),
@@ -281,42 +289,10 @@ testcases_grouped = [
         disc2 p2, p3;
         real real1, real2=4.5;
         integer int1=4, int2;
+        analog int1=real2
         endmodule
         """,
-                flatten(
-                    [
-                        [tok.MODULE, tok.modname],
-                        [
-                            tok.LPAREN,
-                            tok.INOUT,
-                            tok.disc1,
-                            tok.p1,
-                            tok.RPAREN,
-                            tok.SEMICOLON,
-                        ],
-                        [tok.INPUT, tok.p2, tok.COMMA, tok.p3, tok.SEMICOLON],
-                        [tok.disc2, tok.p2, tok.COMMA, tok.p3, tok.SEMICOLON],
-                        [
-                            tok.REAL,
-                            tok.real1,
-                            tok.COMMA,
-                            tok.real2,
-                            tok.ASSIGNOP,
-                            tok(4.5),
-                            tok.SEMICOLON,
-                        ],
-                        [
-                            tok.INTEGER,
-                            tok.int1,
-                            tok.ASSIGNOP,
-                            tok(4),
-                            tok.COMMA,
-                            tok.int2,
-                            tok.SEMICOLON,
-                        ],
-                        [tok.ENDMODULE],
-                    ]
-                ),
+                None,
                 pt.Module(
                     name=tok.modname,
                     ports=[
@@ -343,7 +319,51 @@ testcases_grouped = [
                         ),
                         pt.Variable(name=tok.int2, type=tok.INTEGER, initializer=None),
                     ],
+                    statements=[pt.Assignment(lvalue=tok.int1, value=pt.Identifier(tok.real2))],
                 ),
+            )
+        ],
+    ),
+    (
+        Parser.sourcefile,
+        [
+            (
+                """
+        module modname(inout disc1 p1);
+        input p2, p3;
+        disc2 p2, p3;
+        real real1, real2=4.5;
+        integer int1=4, int2;
+        endmodule
+        """,
+                None,
+                pt.SourceFile(natures=[], disciplines=[], modules=[pt.Module(
+                    name=tok.modname,
+                    ports=[
+                        pt.Port(name=tok.p1, direction=tok.INOUT),
+                        pt.Port(name=tok.p2, direction=tok.INPUT),
+                        pt.Port(name=tok.p3, direction=tok.INPUT),
+                    ],
+                    nets=[
+                        pt.Net(name=tok.p1, discipline=tok.disc1),
+                        pt.Net(name=tok.p2, discipline=tok.disc2),
+                        pt.Net(name=tok.p3, discipline=tok.disc2),
+                    ],
+                    variables=[
+                        pt.Variable(name=tok.real1, type=tok.REAL, initializer=None),
+                        pt.Variable(
+                            name=tok.real2,
+                            type=tok.REAL,
+                            initializer=pt.Literal(tok(4.5)),
+                        ),
+                        pt.Variable(
+                            name=tok.int1,
+                            type=tok.INTEGER,
+                            initializer=pt.Literal(tok(4)),
+                        ),
+                        pt.Variable(name=tok.int2, type=tok.INTEGER, initializer=None),
+                    ],
+                )]),
             )
         ],
     ),

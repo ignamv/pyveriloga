@@ -27,6 +27,8 @@ old = [
     [(source, expected_tokens) for source, expected_tokens, _, _ in testcases],
 )
 def test_lexer(source: str, expected_tokens: List[MyToken]):
+    if expected_tokens is None:
+        return
     source = source.replace("\n", " ")
     result = [replace(tok, origin=[]) for tok in lex(content=source)]
     assert result == expected_tokens
