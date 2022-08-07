@@ -73,17 +73,6 @@ def _(node: hir.If):
 
 
 @strip_parsed.register
-def _(node: hir.If):
-    return replace(node, parsed=None, 
-            ports=list(map(strip_parsed, node.ports)),
-            nets=list(map(strip_parsed, node.nets)),
-            branches=list(map(strip_parsed, node.branches)),
-            parameters=list(map(strip_parsed, node.parameters)),
-            statements=list(map(strip_parsed, node.statements)),
-            )
-
-
-@strip_parsed.register
 def _(node: hir.SourceFile):
     return replace(node, parsed=None, 
             modules=list(map(strip_parsed, node.modules)))
