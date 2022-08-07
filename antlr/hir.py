@@ -63,7 +63,12 @@ class Literal:
     type_: VAType
     parsed: Optional[pt.Literal] = None
 
-    def __init__(self, value: int | float | str, type_: Optional[VAType]=None, parsed: Optional[pt.Literal]=None):
+    def __init__(
+        self,
+        value: int | float | str,
+        type_: Optional[VAType] = None,
+        parsed: Optional[pt.Literal] = None,
+    ):
         self.value = value
         if type_ is None:
             type_ = {int: VAType.integer, float: VAType.real, str: VAType.string}[
@@ -79,7 +84,7 @@ class Literal:
 @dataclass(frozen=True)
 class FunctionSignature:
     returntype: VAType
-    parameters: Tuple[VAType,...]
+    parameters: Tuple[VAType, ...]
 
 
 @dataclass(frozen=True)
@@ -168,4 +173,19 @@ class Branch(Symbol):
     def discipline(self):
         return self.net1.discipline
 
-HIR = Union[ Nature, Discipline, Net, Port, Literal, FunctionCall, Variable, Assignment, Block, If, Module, SourceFile, Branch]
+
+HIR = Union[
+    Nature,
+    Discipline,
+    Net,
+    Port,
+    Literal,
+    FunctionCall,
+    Variable,
+    Assignment,
+    Block,
+    If,
+    Module,
+    SourceFile,
+    Branch,
+]

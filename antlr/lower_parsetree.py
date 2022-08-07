@@ -23,6 +23,7 @@ def ensure_type(expression, type_):
         raise Exception(type_)
     return hir.FunctionCall(function=function, arguments=(expression,))
 
+
 class LowerParseTree:
     def __init__(self, contexts: Optional[List[Context]] = None):
         if contexts is None:
@@ -61,10 +62,9 @@ class LowerParseTree:
     def _(self, identifier: pt.Identifier):
         return self.resolve(identifier.name)
 
-
     @lower.register
     def _(self, operation: pt.Operation):
-        operands = [self.lower(operand) for operand in operation.operands] 
+        operands = [self.lower(operand) for operand in operation.operands]
         binary_operators = {
             "*": (builtins.integer_product, builtins.real_product),
             "+": (builtins.integer_addition, builtins.real_addition),
@@ -91,8 +91,13 @@ class LowerParseTree:
     def _(self, funcall: pt.FunctionCall):
         function = self.resolve(funcall.function.name)
         assert len(funcall.args) == len(function.type_.parameters)
-        arguments = [ensure_type(self.lower(arg), type_) for arg, type_ in zip(funcall.args, function.type_.parameters)]
-        return hir.FunctionCall(function=function, arguments=tuple(arguments), parsed=funcall)
+        arguments = [
+            ensure_type(self.lower(arg), type_)
+            for arg, type_ in zip(funcall.args, function.type_.parameters)
+        ]
+        return hir.FunctionCall(
+            function=function, arguments=tuple(arguments), parsed=funcall
+        )
 
     def lower_natures(self, nature_pts: Sequence[pt.Nature]) -> List[hir.Nature]:
         lowered = {}
@@ -105,9 +110,9 @@ class LowerParseTree:
             attributes = {}
             for attr in nature_pt.attributes:
                 name = attr.name.value
-                if name == 'access':
+                if name == "access":
                     value = hir.Accessor(name=attr.value.name.value, nature=nature_hir)
-                elif name.endswith('_nature'):
+                elif name.endswith("_nature"):
                     value = lowered[attr.value.name.value]
                 else:
                     # Evaluate expression
@@ -124,10 +129,10 @@ class LowerParseTree:
         ret = hir.Discipline(name=discipline.name.value, parsed=discipline)
         for attr in discipline.attributes:
             name = attr.name.value
-            if name in ('flow', 'potential'):
+            if name in ("flow", "potential"):
                 value = self.resolve(attr.value)
-            elif name == 'domain':
-                assert attr.value.type in ['DISCRETE', 'CONTINUOUS']
+            elif name == "domain":
+                assert attr.value.type in ["DISCRETE", "CONTINUOUS"]
                 value = attr.value.value
             else:
                 raise Exception(attr.name)
@@ -138,9 +143,11 @@ class LowerParseTree:
     def _(self, module: pt.Module):
         ret = hir.Module(name=module.name.value, parsed=module)
         with self.push_context((ret, SymbolTable())):
-            ret.ports = [self.lower(port) for port in module.ports if port.direction is not None]
+            ret.ports = [
+                self.lower(port) for port in module.ports if port.direction is not None
+            ]
             ret.nets = list(map(self.lower, module.nets))
-            #ret.branches = list(map(self.lower, module.branches))
+            # ret.branches = list(map(self.lower, module.branches))
             ret.variables = list(map(self.lower, module.variables))
             for variable in ret.variables:
                 self.symboltable.define(variable)
@@ -149,16 +156,24 @@ class LowerParseTree:
 
     @lower.register
     def _(self, port: pt.Port):
-        return hir.Port(name=port.name.value, direction=port.direction.value, parsed=port)
+        return hir.Port(
+            name=port.name.value, direction=port.direction.value, parsed=port
+        )
 
     @lower.register
     def _(self, net: pt.Net):
-        return hir.Net(name=net.name.value, discipline=self.resolve(net.discipline), parsed=net)
+        return hir.Net(
+            name=net.name.value, discipline=self.resolve(net.discipline), parsed=net
+        )
 
     @staticmethod
     def lower_type(typetoken):
         try:
-            return {'STRING': VAType.string, 'REAL': VAType.real, 'INTEGER': VAType.integer}[typetoken.type]
+            return {
+                "STRING": VAType.string,
+                "REAL": VAType.real,
+                "INTEGER": VAType.integer,
+            }[typetoken.type]
         except KeyError:
             raise Exception(typetoken)
 
@@ -168,11 +183,20 @@ class LowerParseTree:
             initializer = None
         else:
             initializer = self.lower(variable.initializer)
-        return hir.Variable(name=variable.name.value, type_=self.lower_type(variable.type), initializer=initializer, parsed=variable)
+        return hir.Variable(
+            name=variable.name.value,
+            type_=self.lower_type(variable.type),
+            initializer=initializer,
+            parsed=variable,
+        )
 
     @lower.register
     def _(self, assignment: pt.Assignment):
-        return hir.Assignment(lvalue=self.resolve(assignment.lvalue), value=self.lower(assignment.value), parsed=assignment)
+        return hir.Assignment(
+            lvalue=self.resolve(assignment.lvalue),
+            value=self.lower(assignment.value),
+            parsed=assignment,
+        )
 
     @lower.register
     def _(self, sourcefile: pt.SourceFile):

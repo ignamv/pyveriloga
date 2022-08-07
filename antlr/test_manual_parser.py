@@ -36,7 +36,7 @@ def test_peek():
     assert iterator.eof()
 
 
-@pytest.mark.parametrize( "source,tokens,method,expected", testcases)
+@pytest.mark.parametrize("source,tokens,method,expected", testcases)
 def test_parser(
     source: str,
     tokens: Optional[List[MyToken]],
@@ -44,7 +44,9 @@ def test_parser(
     expected: pt.ParseTree,
 ):
     if tokens is None:
-        tokens = [replace(tok, origin=[]) for tok in VerilogAPreprocessor(lex(content=source))]
+        tokens = [
+            replace(tok, origin=[]) for tok in VerilogAPreprocessor(lex(content=source))
+        ]
     guard = [tok.guard]
     parser = Parser(tokens + guard)
     result = method(parser)

@@ -28,9 +28,7 @@ from vabuiltins import builtins
                 builtins.integer_addition,
                 (
                     hir.Literal(1),
-                    hir.FunctionCall(
-                        builtins.cast_real_to_int, (hir.Literal(3.0),)
-                    ),
+                    hir.FunctionCall(builtins.cast_real_to_int, (hir.Literal(3.0),)),
                 ),
             ),
             4,
@@ -47,9 +45,7 @@ from vabuiltins import builtins
                 builtins.real_subtraction,
                 (
                     hir.Literal(0.5),
-                    hir.FunctionCall(
-                        builtins.cast_int_to_real, (hir.Literal(3),)
-                    ),
+                    hir.FunctionCall(builtins.cast_int_to_real, (hir.Literal(3),)),
                 ),
             ),
             -2.5,

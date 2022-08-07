@@ -24,7 +24,7 @@ logicalnegation = tok.LOGICALNEGATION
 comma = tok.COMMA
 ternary = tok.TERNARY
 colon = tok.COLON
-temperature = MyToken(type='SYSTEM_IDENTIFIER', value='$temperature', origin=[])
+temperature = MyToken(type="SYSTEM_IDENTIFIER", value="$temperature", origin=[])
 
 testcases_grouped = [
     (
@@ -319,7 +319,9 @@ testcases_grouped = [
                         ),
                         pt.Variable(name=tok.int2, type=tok.INTEGER, initializer=None),
                     ],
-                    statements=[pt.Assignment(lvalue=tok.int1, value=pt.Identifier(tok.real2))],
+                    statements=[
+                        pt.Assignment(lvalue=tok.int1, value=pt.Identifier(tok.real2))
+                    ],
                 ),
             )
         ],
@@ -337,33 +339,43 @@ testcases_grouped = [
         endmodule
         """,
                 None,
-                pt.SourceFile(natures=[], disciplines=[], modules=[pt.Module(
-                    name=tok.modname,
-                    ports=[
-                        pt.Port(name=tok.p1, direction=tok.INOUT),
-                        pt.Port(name=tok.p2, direction=tok.INPUT),
-                        pt.Port(name=tok.p3, direction=tok.INPUT),
+                pt.SourceFile(
+                    natures=[],
+                    disciplines=[],
+                    modules=[
+                        pt.Module(
+                            name=tok.modname,
+                            ports=[
+                                pt.Port(name=tok.p1, direction=tok.INOUT),
+                                pt.Port(name=tok.p2, direction=tok.INPUT),
+                                pt.Port(name=tok.p3, direction=tok.INPUT),
+                            ],
+                            nets=[
+                                pt.Net(name=tok.p1, discipline=tok.disc1),
+                                pt.Net(name=tok.p2, discipline=tok.disc2),
+                                pt.Net(name=tok.p3, discipline=tok.disc2),
+                            ],
+                            variables=[
+                                pt.Variable(
+                                    name=tok.real1, type=tok.REAL, initializer=None
+                                ),
+                                pt.Variable(
+                                    name=tok.real2,
+                                    type=tok.REAL,
+                                    initializer=pt.Literal(tok(4.5)),
+                                ),
+                                pt.Variable(
+                                    name=tok.int1,
+                                    type=tok.INTEGER,
+                                    initializer=pt.Literal(tok(4)),
+                                ),
+                                pt.Variable(
+                                    name=tok.int2, type=tok.INTEGER, initializer=None
+                                ),
+                            ],
+                        )
                     ],
-                    nets=[
-                        pt.Net(name=tok.p1, discipline=tok.disc1),
-                        pt.Net(name=tok.p2, discipline=tok.disc2),
-                        pt.Net(name=tok.p3, discipline=tok.disc2),
-                    ],
-                    variables=[
-                        pt.Variable(name=tok.real1, type=tok.REAL, initializer=None),
-                        pt.Variable(
-                            name=tok.real2,
-                            type=tok.REAL,
-                            initializer=pt.Literal(tok(4.5)),
-                        ),
-                        pt.Variable(
-                            name=tok.int1,
-                            type=tok.INTEGER,
-                            initializer=pt.Literal(tok(4)),
-                        ),
-                        pt.Variable(name=tok.int2, type=tok.INTEGER, initializer=None),
-                    ],
-                )]),
+                ),
             )
         ],
     ),

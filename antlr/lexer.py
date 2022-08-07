@@ -100,9 +100,8 @@ lexer = ply.lex.lex()
 
 TokenSource = Iterator[MyToken]
 
-def lex(
-    filename: Optional[str] = None, content: Optional[str] = None
-    ) -> TokenSource:
+
+def lex(filename: Optional[str] = None, content: Optional[str] = None) -> TokenSource:
     if content is None:
         assert (
             filename is not None

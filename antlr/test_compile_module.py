@@ -14,7 +14,9 @@ def test_from_hir_mocking_module_to_llvm_module_ir(monkeypatch):
     func = ir.Function(codegen.irmodule, functype, name="run_analog")
     vars_ = {}
     for ii in range(1, 4):
-        hirvar = hir.Variable(name="real" + str(ii), type_=VAType.real, initializer=None)
+        hirvar = hir.Variable(
+            name="real" + str(ii), type_=VAType.real, initializer=None
+        )
         compiledvar = ir.GlobalVariable(
             codegen.irmodule, vatype_to_llvmtype(hirvar.type_), hirvar.name
         )

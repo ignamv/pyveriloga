@@ -6,12 +6,15 @@ from itertools import takewhile, count
 from lexer import lex, TokenSource
 from mytoken import MyToken, FileLocation
 
+
 @dataclass
 class Macro:
     parameters: List[str]
     body: List[MyToken]
 
-    def expand(self, arguments: List[List[MyToken]], origin: List[FileLocation]) -> TokenSource:
+    def expand(
+        self, arguments: List[List[MyToken]], origin: List[FileLocation]
+    ) -> TokenSource:
         for tok in self.body:
             tok = tok.included_from(origin)
             if tok.type == "SIMPLE_IDENTIFIER":
@@ -26,10 +29,12 @@ class Macro:
                     continue
             yield tok
 
+
 Definitions = Mapping[str, Macro]
 
+
 class VerilogAPreprocessor:
-    def __init__(self, source: TokenSource, definitions: Optional[Definitions]=None):
+    def __init__(self, source: TokenSource, definitions: Optional[Definitions] = None):
         self.input_iterator = self.input_generator(source)
         self.output_iterator = self.output_generator()
         if definitions is None:
@@ -51,7 +56,11 @@ class VerilogAPreprocessor:
     def fail(self, why):
         raise Exception(why, self.last_token)
 
-    def output_generator(self, source:Optional[TokenSource]=None, end:Union[Tuple[Optional[str],...],Optional[str]]=None):
+    def output_generator(
+        self,
+        source: Optional[TokenSource] = None,
+        end: Union[Tuple[Optional[str], ...], Optional[str]] = None,
+    ):
         if source is None:
             source = self.input_iterator
         if not isinstance(end, tuple):
