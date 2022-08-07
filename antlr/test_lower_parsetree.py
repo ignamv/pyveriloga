@@ -146,13 +146,23 @@ endmodule
     assert discipline.flow.abstol == 1e-12
     assert discipline.flow.idt_nature.name == 'Charge'
 
-def test_lower_parsetree_sourcefile():
-    source = DISCIPLINES + '''
+real1 = hir.Variable(name='real1', type_=VAType.real, initializer=None)
+real2 = hir.Variable(name='real2', type_=VAType.real, initializer=hir.Literal(4.5))
+int1 = hir.Variable(name='int1', type_=VAType.integer, initializer=hir.Literal(4))
+int2 = hir.Variable(name='int2', type_=VAType.integer, initializer=None)
+
+@pytest.mark.parametrize('statement_source,statement_lowered', [
+    ('int1 = real2 * int2', hir.Assignment(lvalue=int1, value=hir.FunctionCall(function=builtins.real_product, arguments=(
+                real2, hir.FunctionCall(function=builtins.cast_int_to_real, arguments=(int2,))
+            )))),
+])
+def test_lower_parsetree_statement(statement_source, statement_lowered):
+    source = DISCIPLINES + f'''
 module mymod(p1, p2);
 inout electrical p1, p2;
 real real1, real2=4.5;
 integer int1=4, int2;
-analog int1 = real2 * int2
+analog {statement_source}
 endmodule
 '''
     expected = 3
@@ -163,10 +173,6 @@ endmodule
     contexts = [(None, SymbolTable(builtins.symbols.values()))]
     sourcefile = strip_parsed(LowerParseTree(contexts=contexts).lower(parsetree))
     electrical = sourcefile.modules[0].nets[0].discipline
-    real1 = hir.Variable(name='real1', type_=VAType.real, initializer=None)
-    real2 = hir.Variable(name='real2', type_=VAType.real, initializer=hir.Literal(4.5))
-    int1 = hir.Variable(name='int1', type_=VAType.integer, initializer=hir.Literal(4))
-    int2 = hir.Variable(name='int2', type_=VAType.integer, initializer=None)
     expected_module = hir.Module(
         name='mymod',
         nets=[
@@ -178,11 +184,7 @@ endmodule
             hir.Port(name='p2', direction='inout'),
         ],
         variables=[real1, real2, int1, int2],
-        statements=[
-            hir.Assignment(lvalue=int1, value=hir.FunctionCall(function=builtins.real_product, arguments=(
-                real2, hir.FunctionCall(function=builtins.cast_int_to_real, arguments=(int2,))
-            ))),
-        ],
+        statements=[statement_lowered],
     )
     assert len(sourcefile.modules) == 1
     assert sourcefile.modules[0] == expected_module
