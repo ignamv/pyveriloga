@@ -192,10 +192,20 @@ class LowerParseTree:
 
     @lower.register
     def _(self, assignment: pt.Assignment):
+        lvalue = self.resolve(assignment.lvalue)
         return hir.Assignment(
-            lvalue=self.resolve(assignment.lvalue),
-            value=self.lower(assignment.value),
+            lvalue=lvalue,
+            value=ensure_type(self.lower(assignment.value), lvalue.type_),
             parsed=assignment,
+        )
+
+    @lower.register
+    def _(self, if_: pt.If):
+        else_ = self.lower(if_.else_) if if_.else_ is not None else None
+        return hir.If(
+            condition=self.lower(if_.condition),
+            then=self.lower(if_.then),
+            else_=else_,
         )
 
     @lower.register

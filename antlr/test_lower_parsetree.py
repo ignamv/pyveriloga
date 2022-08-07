@@ -10,34 +10,7 @@ from dataclasses import replace
 from vabuiltins import builtins
 from symboltable import SymbolTable
 from functools import singledispatch
-
-DISCIPLINES = """
-nature Current; 
-  units        = "A";
-  access       = I;
-  idt_nature   = Charge;
-  abstol       = 1e-12;
-endnature 
-
-nature Voltage; 
-  units      = "V";
-  access     = V;
-  abstol     = 1e-6;
-endnature 
-
-nature Charge; 
-  units      = "coul";
-  access     = Q;
-  ddt_nature = Current;
-  abstol     = 1e-14;
-endnature
-
-discipline electrical; 
-  potential    Voltage;
-  flow         Current;
-enddiscipline
-"""
-
+from utils import DISCIPLINES
 
 @singledispatch
 def strip_parsed(node: hir.HIR) -> hir.HIR:
@@ -102,7 +75,7 @@ def _(node: hir.If):
         parsed=None,
         condition=strip_parsed(node.condition),
         then=strip_parsed(node.then),
-        else_=strip_parsed(node.else_),
+        else_=strip_parsed(node.else_) if node.else_ is not None else None,
     )
 
 
@@ -284,7 +257,7 @@ int2 = hir.Variable(name="int2", type_=VAType.integer, initializer=None)
             "int1 = real2 * int2",
             hir.Assignment(
                 lvalue=int1,
-                value=hir.FunctionCall(
+                value=hir.FunctionCall(function=builtins.cast_real_to_int, arguments=(hir.FunctionCall(
                     function=builtins.real_product,
                     arguments=(
                         real2,
@@ -292,8 +265,23 @@ int2 = hir.Variable(name="int2", type_=VAType.integer, initializer=None)
                             function=builtins.cast_int_to_real, arguments=(int2,)
                         ),
                     ),
-                ),
+                ),)),
             ),
+        ),
+        (
+            "if (real1) int1 = int2",
+            hir.If(
+                condition=real1,
+                then=hir.Assignment(lvalue=int1, value=int2),
+            )
+        ),
+        (
+            "if (real1) int1 = int2 else int2 = int1",
+            hir.If(
+                condition=real1,
+                then=hir.Assignment(lvalue=int1, value=int2),
+                else_=hir.Assignment(lvalue=int2, value=int1),
+            )
         ),
     ],
 )
@@ -309,7 +297,6 @@ analog {statement_source}
 endmodule
 """
     )
-    expected = 3
     tokens = list(VerilogAPreprocessor(lex(content=source)))
     parser = Parser(tokens)
     parsetree = parser.sourcefile()

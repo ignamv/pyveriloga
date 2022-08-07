@@ -6,6 +6,8 @@ from llvmlite import ir
 from vabuiltins import builtins
 from verilogatypes import VAType
 import hir
+from parser_interface import parse_source
+from utils import DISCIPLINES
 
 
 def test_from_hir_mocking_module_to_llvm_module_ir(monkeypatch):
@@ -139,6 +141,24 @@ def test_from_hir_if():
             )
         ],
     )
+    compiled = CompiledModule.from_hir(module)
+    for x1 in [0, 1]:
+        for x2 in [0, 1]:
+            compiled.vars["real1"] = x1
+            compiled.vars["real2"] = x2
+            compiled.run_analog()
+            assert compiled.vars["real3"] == x1 + 2 * x2
+
+
+def test_from_source_if():
+    source = DISCIPLINES + '''
+    module mymod();
+    real real1, real2, real3;
+
+    analog if (real1) if (real2) real3=3 else real3=1 else if(real2) real3=2 else real3=0
+    endmodule
+    '''
+    module = parse_source(source).modules[0]
     compiled = CompiledModule.from_hir(module)
     for x1 in [0, 1]:
         for x2 in [0, 1]:

@@ -1,6 +1,7 @@
-from lower_parsetree import lower_parsetree
+from lower_parsetree import LowerParseTree
 from lexer import lex
-from manual_parser import Parser
+from manual_parser import Parser, ParseMethod
+from preprocessor import VerilogAPreprocessor
 from typing import Optional, List
 from parsetree import ParseTree
 from mytoken import MyToken
@@ -12,10 +13,11 @@ def parse_source(
     filename: Optional[str] = None,
     method: Optional[ParseMethod] = None,
 ) -> HIR:
+    """Lex, preprocess, parse and lower"""
     tokens = list(VerilogAPreprocessor(lex(content=content, filename=filename)))
     if method is None:
         method = Parser.sourcefile
     parser = Parser(tokens)
     parsetree = method(parser)
-    hir = lower_parsetree(parsetree)
+    hir = LowerParseTree().lower(parsetree)
     return hir
