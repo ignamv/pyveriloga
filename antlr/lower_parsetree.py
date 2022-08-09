@@ -151,6 +151,8 @@ class LowerParseTree:
             ret.variables = list(map(self.lower, module.variables))
             for variable in ret.variables:
                 self.symboltable.define(variable)
+            for net in ret.nets:
+                self.symboltable.define(net)
             ret.statements = list(map(self.lower, module.statements))
         return ret
 
@@ -207,6 +209,30 @@ class LowerParseTree:
             then=self.lower(if_.then),
             else_=else_,
         )
+
+    @lower.register
+    def _(self, contribution: pt.AnalogContribution):
+        net1 = self.resolve(contribution.arg1)
+        accessor = self.resolve(contribution.accessor)
+        assert isinstance(accessor, hir.Accessor)
+        nature = accessor.nature
+        if nature == net1.discipline.potential:
+            type_ = "potential"
+        elif nature == net1.discipline.flow:
+            type_ = "flow"
+        else:
+            raise Exception(
+                "Accessor is neither flow nor potential for given net", contribution
+            )
+        assert isinstance(net1, hir.Net)
+        if contribution.arg2 is not None:
+            net2 = self.resolve(contribution.arg2)
+            assert isinstance(net2, hir.Net)
+            assert net1.discipline is net2.discipline
+        else:
+            net2 = None
+        value = self.lower(contribution.value)
+        return hir.AnalogContribution(plus=net1, minus=net2, type_=type_, value=value)
 
     @lower.register
     def _(self, sourcefile: pt.SourceFile):
