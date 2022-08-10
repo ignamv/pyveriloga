@@ -307,7 +307,7 @@ class Parser:
         while True:
             nets.append(
                 pt.Net(
-                    name=self.expect_type("SIMPLE_IDENTIFIER"), discipline=discipline
+                    name=self.expect_type("SIMPLE_IDENTIFIER", why='Net discipline'), discipline=discipline
                 )
             )
             tok = self.expect_types(("SEMICOLON", "COMMA"))
