@@ -217,13 +217,6 @@ class If:
 
 
 @dataclass(frozen=True)
-class FlowContribution:
-    into: Net
-    value: Expression
-    parsed: Optional[pt.AnalogContribution] = None
-
-
-@dataclass(frozen=True)
 class AnalogContribution(HIR):
     plus: Net
     minus: Net
