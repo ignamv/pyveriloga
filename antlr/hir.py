@@ -218,8 +218,7 @@ class If:
 
 @dataclass(frozen=True)
 class AnalogContribution(HIR):
-    plus: Net
-    minus: Net
+    branch: Branch
     value: Expression
     type_: Literal["flow", "potential"]
     parsed: Optional[pt.AnalogContribution] = None
@@ -228,8 +227,7 @@ class AnalogContribution(HIR):
         return replace(
             self,
             parsed=None,
-            plus=self.plus.strip_parsed(),
-            minus=self.minus.strip_parsed() if self.minus is not None else None,
+            branch=self.branch.strip_parsed(),
             value=self.value.strip_parsed(),
         )
 
@@ -285,11 +283,14 @@ class Accessor(Symbol):
 @dataclass(frozen=False)
 class Branch(Symbol):
     net1: Net
-    net2: Net
+    net2: Optional[Net]
 
     @property
     def discipline(self):
         return self.net1.discipline
+
+    def strip_parsed(self):
+        return replace(self, net1=self.net1.strip_parsed(), net2=self.net2.strip_parsed() if self.net2 is not None else None)
 
 
 HIR = Union[

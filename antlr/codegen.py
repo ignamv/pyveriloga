@@ -29,9 +29,19 @@ class CodegenContext:
     def __init__(self):
         self.irmodule = ir.Module(name=__file__)
         self.builder = None
-        # Need a way to store compiled symbols (HIR functions or variables)
-        # which compares identity and not equality
-        self.compiled = CustomDict(key=id)
+        # Dicts which look up based on identity and not equality
+        # Compiled functions
+        self.functions = CustomDict(key=id)
+        # Compiled variables
+        self.variables = CustomDict(key=id)
+        # Global variables set by simulator with net potentials
+        self.net_potential = CustomDict(key=id)
+        # Global variables set by module with net flow contributions
+        self.net_flow = CustomDict(key=id)
+        # Global variables set by simulator with branch flows
+        # self.branch_flow = CustomDict(key=id) # TODO
+        # Global variables set by module with branch potentials
+        # self.branch_potential = CustomDict(key=id) # TODO
 
     def declare_builtins(self):
         # Declare LLVM intrinsics as extern
@@ -42,7 +52,7 @@ class CodegenContext:
         for name, vafunc in intrinsic_names.items():
             functype = vatype_to_llvmtype(vafunc.type_)
             llvmfunc = ir.Function(self.irmodule, functype, name=name)
-            self.compiled[vafunc] = llvmfunc
+            self.functions[vafunc] = llvmfunc
 
     @classmethod
     def expression_to_llvm_module_ir(cls, expression, funcname):
@@ -90,15 +100,14 @@ class CodegenContext:
         if func in logical_instructions:
             i1_result = logical_instructions[func](lhs=args[0], rhs=args[1])
             return self.builder.zext(i1_result, llvmint)
-        if func in self.compiled:
-            return self.builder.call(self.compiled[func], args)
+        if func in self.functions:
+            return self.builder.call(self.functions[func], args)
         else:
             raise NotImplementedError(func)
 
     @expression_to_ir.register
     def _(self, variable: hir.Variable):
-        pointer = self.variable_to_ir(variable)
-        return self.builder.load(pointer)
+        return self.builder.load(self.variables[variable])
 
     @classmethod
     def module_to_llvm_module_ir(cls, module):
@@ -106,21 +115,32 @@ class CodegenContext:
         codegen.declare_builtins()
         functype = ir.FunctionType(ir.VoidType(), ())
         func = ir.Function(codegen.irmodule, functype, name="run_analog")
+        for variable in module.variables:
+            irvar = ir.GlobalVariable(
+                codegen.irmodule, vatype_to_llvmtype(variable.type_), variable.name
+            )
+            irvar.initializer = ir.Constant(vatype_to_llvmtype(variable.type_), 0)
+            codegen.variables[variable] = irvar
+        for net in module.nets:
+            irvar = ir.GlobalVariable(
+                codegen.irmodule, vatype_to_llvmtype(VAType.real), '__net_potential_' + net.name
+            )
+            irvar.initializer = ir.Constant(vatype_to_llvmtype(VAType.real), 0)
+            codegen.net_potential[net] = irvar
+            irvar = ir.GlobalVariable(
+                codegen.irmodule, vatype_to_llvmtype(VAType.real), '__net_flow_' + net.name
+            )
+            irvar.initializer = ir.Constant(vatype_to_llvmtype(VAType.real), 0)
+            codegen.net_flow[net] = irvar
         block = func.append_basic_block(name="entry")
         codegen.builder = ir.IRBuilder(block)
+        # Set all outputs to 0 at the beginning
+        for var in codegen.net_flow.values():
+            codegen.builder.store(ir.Constant(vatype_to_llvmtype(VAType.real), 0), var)
         for statement in module.statements:
             codegen.statement_to_ir(statement)
         codegen.builder.ret_void()
         return codegen
-
-    def variable_to_ir(self, variable):
-        if variable not in self.compiled:
-            irvar = ir.GlobalVariable(
-                self.irmodule, vatype_to_llvmtype(variable.type_), variable.name
-            )
-            irvar.initializer = ir.Constant(vatype_to_llvmtype(variable.type_), 0)
-            self.compiled[variable] = irvar
-        return self.compiled[variable]
 
     @singledispatchmethod
     def statement_to_ir(self, statement: hir.Statement):
@@ -129,8 +149,24 @@ class CodegenContext:
     @statement_to_ir.register
     def _(self, assignment: hir.Assignment):
         value = self.expression_to_ir(assignment.value)
-        lvalue = self.variable_to_ir(assignment.lvalue)
-        self.builder.store(value, lvalue)
+        self.builder.store(value, self.variables[assignment.lvalue])
+
+    @statement_to_ir.register
+    def _(self, analogcontribution: hir.AnalogContribution):
+        contribution = self.expression_to_ir(analogcontribution.value)
+        if analogcontribution.type_ == 'flow':
+            for net, sign in [(analogcontribution.branch.net1, 1), (analogcontribution.branch.net2, -1)]:
+                if sign == -1 and net is None:
+                    break
+                lvalue = self.net_flow[net]
+                oldvalue = self.builder.load(lvalue)
+                if sign == 1:
+                    newvalue = self.builder.fadd(oldvalue, contribution)
+                else:
+                    newvalue = self.builder.fsub(oldvalue, contribution)
+                self.builder.store(newvalue, lvalue)
+        else:
+            raise NotImplementedError(analogcontribution.type_)
 
     @statement_to_ir.register
     def _(self, block: hir.Block):

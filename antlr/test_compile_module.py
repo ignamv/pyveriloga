@@ -23,7 +23,7 @@ def test_from_hir_mocking_module_to_llvm_module_ir(monkeypatch):
             codegen.irmodule, vatype_to_llvmtype(hirvar.type_), hirvar.name
         )
         compiledvar.initializer = ir.Constant(vatype_to_llvmtype(VAType.real), 0)
-        vars_[ii] = codegen.compiled[hirvar] = compiledvar
+        vars_[ii] = codegen.variables[hirvar] = compiledvar
     block = func.append_basic_block(name="entry")
     codegen.builder = ir.IRBuilder(block)
     real1 = codegen.builder.load(vars_[1])
@@ -72,6 +72,7 @@ real3 = hir.Variable(name="real3", type_=VAType.real, initializer=None)
 def test_from_hir_addition():
     module = hir.Module(
         name="mymod",
+        variables=[real1, real2, real3],
         statements=[
             hir.Assignment(
                 lvalue=real3,
@@ -95,6 +96,7 @@ def test_from_hir_addition():
 def test_from_hir_block():
     module = hir.Module(
         name="mymod",
+        variables=[real1,real2,real3],
         statements=[
             hir.Block(
                 [
@@ -125,6 +127,7 @@ def test_from_hir_block():
 def test_from_hir_if():
     module = hir.Module(
         name="mymod",
+        variables=[real1,real2,real3],
         statements=[
             hir.If(
                 condition=real1,
@@ -169,3 +172,24 @@ def test_from_source_if():
             compiled.vars["real2"] = x2
             compiled.run_analog()
             assert compiled.vars["real3"] == x1 + 2 * x2
+
+
+def test_analogcontribution():
+    source = (
+        DISCIPLINES
+        + """
+    module mymod(net1, net2);
+    inout electrical net1, net2;
+
+    analog I(net1) <+ 3.5
+    analog I(net2, net1) <+ 4.5
+    endmodule
+    """
+    )
+    module = parse_source(source).modules[0]
+    import pdb; pdb.set_trace()
+    compiled = CompiledModule.from_hir(module)
+    for _ in range(2):
+        compiled.run_analog()
+        assert compiled.net_flow['net1'] == -1
+        assert compiled.net_flow['net2'] == 4.5

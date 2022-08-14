@@ -216,25 +216,25 @@ net2 = hir.Net(name="net2", discipline=electrical)
         (
             "I(net1) <+ 4.5",
             hir.AnalogContribution(
-                plus=net1, minus=None, type_="flow", value=hir.Literal(4.5)
+                hir.Branch(name='', net1=net1, net2=None), type_="flow", value=hir.Literal(4.5)
             ),
         ),
         (
             "I(net1,net2) <+ 4.5",
             hir.AnalogContribution(
-                plus=net1, minus=net2, type_="flow", value=hir.Literal(4.5)
+                hir.Branch(name='', net1=net1, net2=net2), type_="flow", value=hir.Literal(4.5)
             ),
         ),
         (
             "V(net1) <+ 4.5",
             hir.AnalogContribution(
-                plus=net1, minus=None, type_="potential", value=hir.Literal(4.5)
+                hir.Branch(name='', net1=net1, net2=None), type_="potential", value=hir.Literal(4.5)
             ),
         ),
         (
             "V(net1,net2) <+ 4.5",
             hir.AnalogContribution(
-                plus=net1, minus=net2, type_="potential", value=hir.Literal(4.5)
+                hir.Branch(name='', net1=net1, net2=net2), type_="potential", value=hir.Literal(4.5)
             ),
         ),
     ],

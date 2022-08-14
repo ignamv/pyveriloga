@@ -213,6 +213,8 @@ class LowerParseTree:
     @lower.register
     def _(self, contribution: pt.AnalogContribution):
         net1 = self.resolve(contribution.arg1)
+        # TODO: handle branch argument
+        assert isinstance(net1, hir.Net)
         accessor = self.resolve(contribution.accessor)
         assert isinstance(accessor, hir.Accessor)
         nature = accessor.nature
@@ -231,8 +233,9 @@ class LowerParseTree:
             assert net1.discipline is net2.discipline
         else:
             net2 = None
+        branch = hir.Branch(name='', net1=net1, net2=net2)
         value = self.lower(contribution.value)
-        return hir.AnalogContribution(plus=net1, minus=net2, type_=type_, value=value)
+        return hir.AnalogContribution(branch=branch, type_=type_, value=value)
 
     @lower.register
     def _(self, sourcefile: pt.SourceFile):
