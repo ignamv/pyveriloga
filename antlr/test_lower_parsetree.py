@@ -12,6 +12,23 @@ from functools import singledispatch
 from utils import DISCIPLINES
 
 
+
+
+real1 = hir.Variable(name="real1", type_=VAType.real, initializer=None)
+real2 = hir.Variable(name="real2", type_=VAType.real, initializer=hir.Literal(4.5))
+int1 = hir.Variable(name="int1", type_=VAType.integer, initializer=hir.Literal(4))
+int2 = hir.Variable(name="int2", type_=VAType.integer, initializer=None)
+charge = hir.Nature(name="Charge", units="coul", abstol=1e-14)
+charge.access = hir.Accessor(name="Q", nature=charge)
+current = hir.Nature(name="Current", units="A", idt_nature=charge, abstol=1e-12)
+current.access = hir.Accessor(name="I", nature=current)
+charge.ddt_nature = current
+voltage = hir.Nature(name="Voltage", units="V", abstol=1e-6)
+voltage.access = hir.Accessor(name="V", nature=voltage)
+electrical = hir.Discipline(name="electrical", potential=voltage, flow=current)
+net1 = hir.Net(name="net1", discipline=electrical)
+net2 = hir.Net(name="net2", discipline=electrical)
+
 syms = {
     var.name: var
     for var in (
@@ -19,6 +36,13 @@ syms = {
         hir.Variable(name="real2", type_=VAType.real, initializer=hir.Literal(2.5)),
         hir.Variable(name="int1", type_=VAType.integer, initializer=hir.Literal(1)),
         hir.Variable(name="int2", type_=VAType.integer, initializer=hir.Literal(2)),
+        hir.Net(name="net1", discipline=electrical),
+        hir.Net(name="net2", discipline=electrical),
+        voltage.access,
+        current.access,
+        electrical,
+        voltage,
+        current,
     )
 }
 
@@ -27,6 +51,8 @@ syms = {
     "source,expected",
     [
         ("3", hir.Literal(3)),
+        ("-3", hir.FunctionCall(function=builtins.integer_subtraction, arguments=(hir.Literal(0), hir.Literal(3)))),
+        ("-4.0", hir.FunctionCall(function=builtins.real_subtraction, arguments=(hir.Literal(0.), hir.Literal(4.0)))),
         ("real1", syms["real1"]),
         ("3.5", hir.Literal(3.5)),
         (
@@ -119,6 +145,10 @@ syms = {
                 ),
             ),
         ),
+        ("V(net1)", hir.FunctionCall(builtins.potential, (hir.Branch(name='', net1=syms['net1'], net2=None),))),
+        ("V(net1, net2)", hir.FunctionCall(builtins.potential, (hir.Branch(name='', net1=syms['net1'], net2=syms['net2']),))),
+        ("I(net1)", hir.FunctionCall(builtins.flow, (hir.Branch(name='', net1=syms['net1'], net2=None),))),
+        ("I(net1, net2)", hir.FunctionCall(builtins.flow, (hir.Branch(name='', net1=syms['net1'], net2=syms['net2']),))),
     ],
 )
 def test_lower_parsetree_expression(source: str, expected: hir.HIR):
@@ -158,22 +188,6 @@ endmodule
     assert discipline.flow.idt_nature.name == "Charge"
 
 
-real1 = hir.Variable(name="real1", type_=VAType.real, initializer=None)
-real2 = hir.Variable(name="real2", type_=VAType.real, initializer=hir.Literal(4.5))
-int1 = hir.Variable(name="int1", type_=VAType.integer, initializer=hir.Literal(4))
-int2 = hir.Variable(name="int2", type_=VAType.integer, initializer=None)
-charge = hir.Nature(name="Charge", units="coul", abstol=1e-14)
-charge.access = hir.Accessor(name="Q", nature=charge)
-current = hir.Nature(name="Current", units="A", idt_nature=charge, abstol=1e-12)
-current.access = hir.Accessor(name="I", nature=current)
-charge.ddt_nature = current
-voltage = hir.Nature(name="Voltage", units="V", abstol=1e-6)
-voltage.access = hir.Accessor(name="V", nature=voltage)
-electrical = hir.Discipline(name="electrical", potential=voltage, flow=current)
-net1 = hir.Net(name="net1", discipline=electrical)
-net2 = hir.Net(name="net2", discipline=electrical)
-
-
 @pytest.mark.parametrize(
     "statement_source,statement_lowered",
     [
@@ -197,6 +211,17 @@ net2 = hir.Net(name="net2", discipline=electrical)
                     ),
                 ),
             ),
+        ),
+        ('''
+        begin
+            int1=int2;
+            int2=int1;
+        end
+        ''',
+            hir.Block([
+                hir.Assignment(lvalue=int1, value=int2),
+                hir.Assignment(lvalue=int2, value=int1),
+            ])
         ),
         (
             "if (real1) int1 = int2",

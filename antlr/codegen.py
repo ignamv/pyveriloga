@@ -76,6 +76,17 @@ class CodegenContext:
     @expression_to_ir.register
     def _(self, funcall: hir.FunctionCall):
         func = funcall.function
+        if func is builtins.potential:
+            branch, = funcall.arguments
+            pot1 = self.builder.load(self.net_potential[branch.net1])
+            if branch.net2 is not None:
+                pot2 = self.builder.load(self.net_potential[branch.net2])
+                return self.builder.fsub(pot1, pot2)
+            else:
+                return pot1
+        if func is builtins.flow:
+            branch, = funcall.arguments
+            return self.branch_flow[branch]
         args = [self.expression_to_ir(arg) for arg in funcall.arguments]
         instructions = {
             builtins.integer_addition: self.builder.add,

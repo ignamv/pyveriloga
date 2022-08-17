@@ -7,6 +7,7 @@ class VAType(Enum):
     string = auto()
     net = auto()
     void = auto()  # For internal use, not present in VerilogA
+    accessor = auto() # Analog probe
 
     def __repr__(self):
         return "VAType." + self.name

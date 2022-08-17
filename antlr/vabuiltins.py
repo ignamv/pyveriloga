@@ -1,7 +1,9 @@
 from dataclasses import replace
-from hir import FunctionSignature, Function, Variable, Literal
+from hir import FunctionSignature, Function, Variable, Literal, Net
 import keyword
 from verilogatypes import VAType
+
+accessor = FunctionSignature(returntype=VAType.real, parameters=(Net, Net))
 
 binary_int_type = FunctionSignature(
     returntype=VAType.integer, parameters=(VAType.integer, VAType.integer)
@@ -59,6 +61,8 @@ builtins_list.extend(
         Function(name="sin", type_=unary_real_type),
         Function(name="pow", type_=binary_real_type),
         Variable(name="$temperature", type_=VAType.real, initializer=Literal(25)),
+        Function(name="potential", type_=accessor),
+        Function(name="flow", type_=accessor),
     ]
 )
 

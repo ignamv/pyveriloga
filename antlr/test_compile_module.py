@@ -187,9 +187,33 @@ def test_analogcontribution():
     """
     )
     module = parse_source(source).modules[0]
-    import pdb; pdb.set_trace()
     compiled = CompiledModule.from_hir(module)
     for _ in range(2):
         compiled.run_analog()
         assert compiled.net_flow['net1'] == -1
         assert compiled.net_flow['net2'] == 4.5
+
+
+def test_analogprobe():
+    source = (
+        DISCIPLINES
+        + """
+    module mymod(net1, net2);
+    inout electrical net1, net2;
+
+    analog begin
+        I(net1) <+ V(net1, net2);
+        I(net2) <+ -V(net2);
+    end
+
+    endmodule
+    """
+    )
+    module = parse_source(source).modules[0]
+    compiled = CompiledModule.from_hir(module)
+    for _ in range(2):
+        compiled.net_potential['net1'] = 3
+        compiled.net_potential['net2'] = 7
+        compiled.run_analog()
+        assert compiled.net_flow['net1'] == -4
+        assert compiled.net_flow['net2'] == -7

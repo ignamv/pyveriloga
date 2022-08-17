@@ -74,6 +74,25 @@ class LowerParseTree:
             "!=": (builtins.integer_inequality, builtins.real_inequality),
         }
         operator = operation.operator.value
+        if len(operands) == 1:
+            operand, = operands
+            unary_operators = {
+                "+": (builtins.integer_addition, builtins.real_addition),
+                "-": (builtins.integer_subtraction, builtins.real_subtraction),
+            }
+            if operator == '+':
+                return operand
+            elif operator == '-':
+                if operand.type_ == VAType.integer:
+                    function = builtins.integer_subtraction
+                    operands = [hir.Literal(0), operand]
+                elif operand.type_ == VAType.real:
+                    function = builtins.real_subtraction
+                    operands = [hir.Literal(0.0), operand]
+                else:
+                    raise Exception(operation.operands[0])
+            else:
+                raise Exception(operation.operator)
         if operator in binary_operators:
             intfunc, realfunc = binary_operators[operator]
             if any(operand.type_ == VAType.real for operand in operands):
@@ -90,11 +109,18 @@ class LowerParseTree:
     @lower.register
     def _(self, funcall: pt.FunctionCall):
         function = self.resolve(funcall.function.name)
-        assert len(funcall.args) == len(function.type_.parameters)
-        arguments = [
-            ensure_type(self.lower(arg), type_)
-            for arg, type_ in zip(funcall.args, function.type_.parameters)
-        ]
+        arguments = [self.lower(arg) for arg in funcall.args]
+        if isinstance(function, hir.Accessor):
+            assert 1 <= len(arguments) <= 2
+            branch, type_ = self.resolve_analog(function, arguments[0], None if len(arguments) == 1 else arguments[1])
+            arguments = [branch]
+            function = {'potential': builtins.potential, 'flow': builtins.flow}[type_]
+        elif isinstance(function, hir.Function):
+            assert len(funcall.args) == len(function.type_.parameters)
+            arguments = [
+                ensure_type(arg, type_)
+                for arg, type_ in zip(arguments, function.type_.parameters)
+            ]
         return hir.FunctionCall(
             function=function, arguments=tuple(arguments), parsed=funcall
         )
@@ -163,6 +189,13 @@ class LowerParseTree:
         )
 
     @lower.register
+    def _(self, block: pt.Block):
+        return hir.Block(
+            statements=[self.lower(statement) for statement in block.statements],
+            parsed=block,
+        )
+
+    @lower.register
     def _(self, net: pt.Net):
         return hir.Net(
             name=net.name.value, discipline=self.resolve(net.discipline), parsed=net
@@ -210,12 +243,14 @@ class LowerParseTree:
             else_=else_,
         )
 
-    @lower.register
-    def _(self, contribution: pt.AnalogContribution):
-        net1 = self.resolve(contribution.arg1)
+    def resolve_analog(self, accessor, net1, net2):
+        """
+        Determine if accessor is flow or potential, and check net compatibility
+
+        Returns hir.Branch and "flow" or "potential"
+        """
         # TODO: handle branch argument
         assert isinstance(net1, hir.Net)
-        accessor = self.resolve(contribution.accessor)
         assert isinstance(accessor, hir.Accessor)
         nature = accessor.nature
         if nature == net1.discipline.potential:
@@ -226,15 +261,21 @@ class LowerParseTree:
             raise Exception(
                 "Accessor is neither flow nor potential for given net", contribution
             )
-        assert isinstance(net1, hir.Net)
-        if contribution.arg2 is not None:
-            net2 = self.resolve(contribution.arg2)
+        if net2 is not None:
             assert isinstance(net2, hir.Net)
             assert net1.discipline is net2.discipline
         else:
             net2 = None
         branch = hir.Branch(name='', net1=net1, net2=net2)
+        return branch, type_
+
+    @lower.register
+    def _(self, contribution: pt.AnalogContribution):
+        accessor = self.resolve(contribution.accessor)
+        net1 = self.resolve(contribution.arg1)
+        net2 = None if contribution.arg2 is None else self.resolve(contribution.arg2)
         value = self.lower(contribution.value)
+        branch, type_ = self.resolve_analog(accessor, net1, net2)
         return hir.AnalogContribution(branch=branch, type_=type_, value=value)
 
     @lower.register
