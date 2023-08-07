@@ -15,6 +15,14 @@ Supported language features:
 The goal is to be able to compile the standard CMC models like BSIMBULK,
 in order to do fast parallel evaluation for model fitting.
 
+## Structure
+
+The lexer uses [Ply](https://github.com/dabeaz/ply).
+The parser is a hand-written recursive descent parser which generates a parse tree.
+This is lowered to a higher-level representation in `lower_parsetree.py`.
+Executable code is generated in `codegen.py` using [llvmlite](https://github.com/numba/llvmlite).
+Test-driven development.
+
 ## Status
 
 I haven't worked on this for a while, but please reach out if you are interested

@@ -5,7 +5,7 @@ import re
 import os
 from mytoken import MyToken
 
-with open("../from_html/operators") as fd:
+with open("../grammar_manipulation/operators") as fd:
     operators: Dict[str, str] = {}
     for line in fd:
         operator, name = line.strip().split("\t")
@@ -13,7 +13,7 @@ with open("../from_html/operators") as fd:
 for name, value in operators.items():
     globals()["t_" + name] = re.escape(value)
 
-with open("../from_html/reserved") as fd:
+with open("../grammar_manipulation/reserved") as fd:
     reserved = tuple(line.strip() for line in fd)
 
 tokens = (
