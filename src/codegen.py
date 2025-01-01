@@ -24,6 +24,7 @@ def vatype_to_llvmtype(vatype):
     else:
         raise Exception(vatype)
 
+realzero = ir.Constant(vatype_to_llvmtype(VAType.real), 0)
 
 class CodegenContext:
     def __init__(self):
@@ -39,9 +40,9 @@ class CodegenContext:
         # Global variables set by module with net flow contributions
         self.net_flow = CustomDict(key=id)
         # Global variables set by simulator with branch flows
-        # self.branch_flow = CustomDict(key=id) # TODO
+        self.branch_flow = CustomDict(key=self.branch_key)
         # Global variables set by module with branch potentials
-        # self.branch_potential = CustomDict(key=id) # TODO
+        self.branch_potential = CustomDict(key=self.branch_key)
 
     def declare_builtins(self):
         # Declare LLVM intrinsics as extern
@@ -86,7 +87,7 @@ class CodegenContext:
                 return pot1
         if func is builtins.flow:
             branch, = funcall.arguments
-            return self.branch_flow[branch]
+            return self.builder.load(self.branch_flow[branch])
         args = [self.expression_to_ir(arg) for arg in funcall.arguments]
         instructions = {
             builtins.integer_addition: self.builder.add,
@@ -120,6 +121,22 @@ class CodegenContext:
     def _(self, variable: hir.Variable):
         return self.builder.load(self.variables[variable])
 
+    def global_variable(self, name, type_):
+        llvmtype = vatype_to_llvmtype(type_)
+        irvar = ir.GlobalVariable( self.irmodule, llvmtype, name)
+        irvar.initializer = ir.Constant(llvmtype, 0)
+        return irvar
+
+    @staticmethod
+    def branch_key(branch):
+        return branch.net1.name, branch.net2.name if branch.net2 is not None else None
+
+    def declare_branch(self, branch):
+        key = branch
+        name = '__'.join((branch.net1.name, branch.net2.name if branch.net2 is not None else '0'))
+        self.branch_potential[key] = self.global_variable('__branch_potential__' + name, VAType.real)
+        self.branch_flow[key] = self.global_variable('__branch_flow_' + name, VAType.real)
+
     @classmethod
     def module_to_llvm_module_ir(cls, module):
         codegen = cls()
@@ -127,27 +144,19 @@ class CodegenContext:
         functype = ir.FunctionType(ir.VoidType(), ())
         func = ir.Function(codegen.irmodule, functype, name="run_analog")
         for variable in module.variables:
-            irvar = ir.GlobalVariable(
-                codegen.irmodule, vatype_to_llvmtype(variable.type_), variable.name
-            )
-            irvar.initializer = ir.Constant(vatype_to_llvmtype(variable.type_), 0)
-            codegen.variables[variable] = irvar
+            codegen.variables[variable] = codegen.global_variable(variable.name, variable.type_)
         for net in module.nets:
-            irvar = ir.GlobalVariable(
-                codegen.irmodule, vatype_to_llvmtype(VAType.real), '__net_potential_' + net.name
-            )
-            irvar.initializer = ir.Constant(vatype_to_llvmtype(VAType.real), 0)
-            codegen.net_potential[net] = irvar
-            irvar = ir.GlobalVariable(
-                codegen.irmodule, vatype_to_llvmtype(VAType.real), '__net_flow_' + net.name
-            )
-            irvar.initializer = ir.Constant(vatype_to_llvmtype(VAType.real), 0)
-            codegen.net_flow[net] = irvar
+            codegen.net_potential[net] = codegen.global_variable('__net_potential_' + net.name, VAType.real)
+            codegen.net_flow[net] = codegen.global_variable('__net_flow_' + net.name, VAType.real)
+        for branch in module.branches.values():
+            codegen.declare_branch(branch)
         block = func.append_basic_block(name="entry")
         codegen.builder = ir.IRBuilder(block)
         # Set all outputs to 0 at the beginning
         for var in codegen.net_flow.values():
-            codegen.builder.store(ir.Constant(vatype_to_llvmtype(VAType.real), 0), var)
+            codegen.builder.store(realzero, var)
+        for branch_var in codegen.branch_potential.values():
+            codegen.builder.store(realzero, branch_var)
         for statement in module.statements:
             codegen.statement_to_ir(statement)
         codegen.builder.ret_void()
@@ -176,6 +185,11 @@ class CodegenContext:
                 else:
                     newvalue = self.builder.fsub(oldvalue, contribution)
                 self.builder.store(newvalue, lvalue)
+        elif analogcontribution.type_ == 'potential':
+            lvalue = self.branch_potential[analogcontribution.branch]
+            oldvalue = self.builder.load(lvalue)
+            newvalue = self.builder.fadd(oldvalue, contribution)
+            self.builder.store(newvalue, lvalue)
         else:
             raise NotImplementedError(analogcontribution.type_)
 

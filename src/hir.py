@@ -239,7 +239,7 @@ Statement = Union[Assignment, Block, If]
 class Module(Symbol):
     ports: List[Port] = field(default_factory=list)
     nets: List[Net] = field(default_factory=list)
-    branches: List[Branch] = field(default_factory=list)
+    branches: Mapping[Tuple[str,Optional[str]],Branch] = field(default_factory=dict)
     parameters: List[Variable] = field(default_factory=list)
     variables: List[Variable] = field(default_factory=list)
     statements: List[Statement] = field(default_factory=list)
@@ -251,7 +251,7 @@ class Module(Symbol):
             parsed=None,
             ports=[port.strip_parsed() for port in module.ports],
             nets=[net.strip_parsed() for net in module.nets],
-            branches=[branch.strip_parsed() for branch in module.branches],
+            branches={k: branch.strip_parsed() for k,branch in module.branches.items()},
             parameters=[parameter.strip_parsed() for parameter in module.parameters],
             variables=[variable.strip_parsed() for variable in module.variables],
             statements=[statement.strip_parsed() for statement in module.statements],

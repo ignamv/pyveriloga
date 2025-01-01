@@ -266,8 +266,17 @@ class LowerParseTree:
             assert net1.discipline is net2.discipline
         else:
             net2 = None
-        branch = hir.Branch(name='', net1=net1, net2=net2)
-        return branch, type_
+        key = net1.name, net2.name if net2 is not None else None
+        if key not in self.module.branches:
+            self.module.branches[key] = hir.Branch(name='', net1=net1, net2=net2)
+        return self.module.branches[key], type_
+
+    @property
+    def module(self):
+        for maybe_module,_ in reversed(self.contexts):
+            if isinstance(maybe_module, hir.Module):
+                return maybe_module
+        raise KeyError('Module')
 
     @lower.register
     def _(self, contribution: pt.AnalogContribution):

@@ -198,12 +198,14 @@ def test_analogprobe():
     source = (
         DISCIPLINES
         + """
-    module mymod(net1, net2);
-    inout electrical net1, net2;
+    module mymod(net1, net2, net3);
+    inout electrical net1, net2, net3;
 
     analog begin
         I(net1) <+ V(net1, net2);
         I(net2) <+ -V(net2);
+        V(net3, net2) <+ I(net2, net3);
+        V(net1) <+ I(net1);
     end
 
     endmodule

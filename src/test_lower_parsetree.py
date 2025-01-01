@@ -152,12 +152,14 @@ syms = {
     ],
 )
 def test_lower_parsetree_expression(source: str, expected: hir.HIR):
-    symbols = list(syms.values()) + list(builtins.symbols.values())
-    context = [(hir.SourceFile(), SymbolTable(symbols))]
     tokens = list(VerilogAPreprocessor(lex(content=source)))
     parser = Parser(tokens)
     parsetree = parser.expression()
     assert not list(parser.peekiterator), "Not all input was consumed"
+    context = [
+        (hir.SourceFile(), SymbolTable(list(builtins.symbols.values()))),
+        (hir.Module(name='mymod'), SymbolTable(list(syms.values()))),
+    ]
     actual = LowerParseTree(context).lower(parsetree).strip_parsed()
     assert actual == expected
 
@@ -283,6 +285,8 @@ endmodule
     contexts = [(None, SymbolTable(builtins.symbols.values()))]
     sourcefile = LowerParseTree(contexts=contexts).lower(parsetree).strip_parsed()
     electrical = sourcefile.modules[0].nets[0].discipline
+    assert len(sourcefile.modules) == 1
+    module = sourcefile.modules[0]
     expected_module = hir.Module(
         name="mymod",
         nets=[
@@ -295,6 +299,29 @@ endmodule
         ],
         variables=[real1, real2, int1, int2],
         statements=[statement_lowered],
+        branches=module.branches,
     )
-    assert len(sourcefile.modules) == 1
-    assert sourcefile.modules[0] == expected_module
+    assert module == expected_module
+
+
+def test_lower_parsetree_branches():
+    source = (
+        DISCIPLINES
+        + f"""
+module mymod(net1, net2);
+inout electrical net1, net2;
+analog V(net1, net2) <+ I(net1, net2)
+endmodule
+"""
+    )
+    tokens = list(VerilogAPreprocessor(lex(content=source)))
+    parser = Parser(tokens)
+    parsetree = parser.sourcefile()
+    assert not list(parser.peekiterator), "Not all input was consumed"
+    contexts = [(None, SymbolTable(builtins.symbols.values()))]
+    sourcefile = LowerParseTree(contexts=contexts).lower(parsetree).strip_parsed()
+    module = sourcefile.modules[0]
+    assert len(module.branches) == 1
+    branch = module.branches["net1","net2"]
+    assert branch.net1.name == 'net1'
+    assert branch.net2.name == 'net2'
