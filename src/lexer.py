@@ -62,6 +62,13 @@ def t_NEWLINE(t):
     return t
 
 
+def t_COMMENT(t):
+    r"//.*\n"
+    t.lexer.lineno += 1
+    t.lexer.line_beginning = t.lexpos + len(t.value)
+
+
+
 def t_REAL_NUMBER(t):
     r"\d+\.\d+([TGMKkmunpfa]|[eE][+-]*\d+)?|\d+([TGMKkmunpfa]|[eE][+-]*\d+)"
     t.value = float(t.value)
