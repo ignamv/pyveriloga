@@ -71,6 +71,21 @@ def t_COMMENT(t):
 
 def t_REAL_NUMBER(t):
     r"\d+\.\d+([TGMKkmunpfa]|[eE][+-]*\d+)?|\d+([TGMKkmunpfa]|[eE][+-]*\d+)"
+    exponents = {
+        "a": -18,
+        "f": -15,
+        "p": -12,
+        "n": -9,
+        "u": -6,
+        "m": -3,
+        "k": 3,
+        "K": 3,
+        "M": 6,
+        "G": 9,
+        "T": 12,
+    }
+    if t.value[-1] in exponents:
+        t.value = t.value[:-1] + "e" + str(exponents[t.value[-1]])
     t.value = float(t.value)
     return t
 

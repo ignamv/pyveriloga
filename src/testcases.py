@@ -34,6 +34,7 @@ testcases_grouped = [
             ("$temperature", [temperature], pt.Identifier(temperature)),
             ("3", [three], pt.Literal(three)),
             ("3.5", [real], pt.Literal(real)),
+            ("3.5K", [tok(3500.)], pt.Literal(tok(3500.))),
             (
                 "name()",
                 [simpleid, lparen, rparen],
