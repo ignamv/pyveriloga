@@ -219,3 +219,46 @@ def test_lexer():
     assert tokens == [
         MyToken("SYSTEM_IDENTIFIER", "$temperature", origin=[("dummyfile", 1, 1)]),
     ]
+
+
+def test_include_same_dir(tmp_path):
+    parent = tmp_path / "parent.va"
+    parent.write_text("""
+    `include "child.va"
+    `CHILD_MACRO(2)
+    """)
+    child = tmp_path / "child.va"
+    child.write_text("`define CHILD_MACRO(x) 3*x\n")
+    expected_src = """
+    `define CHILD_MACRO(x) 3*x
+    3*2
+    """
+    tokens = [strip_token_origin(t) for t in VerilogAPreprocessor(lex(filename=parent))]
+    expected = [strip_token_origin(t) for t in VerilogAPreprocessor(lex(content=expected_src))]
+    assert tokens == expected
+    # TODO: test absolute paths, add include search paths
+
+
+def test_include_search_path(tmp_path):
+    parentdir = tmp_path / "parentdir"
+    parentdir.mkdir()
+    parent = parentdir / "parent.va"
+    parent.write_text("""
+    `include "child.va"
+    `CHILD_MACRO(2)
+    """)
+    childdir = tmp_path / "childdir"
+    childdir.mkdir()
+    child = childdir / "child.va"
+    child.write_text("`define CHILD_MACRO(x) 3*x\n")
+    expected_src = """
+    `define CHILD_MACRO(x) 3*x
+    3*2
+    """
+    tokens = [
+        strip_token_origin(t)
+        for t in VerilogAPreprocessor(lex(filename=parent), include_path=[childdir])
+    ]
+    expected = [strip_token_origin(t) for t in VerilogAPreprocessor(lex(content=expected_src))]
+    assert tokens == expected
+    # TODO: test absolute paths

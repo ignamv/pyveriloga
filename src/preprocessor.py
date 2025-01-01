@@ -1,8 +1,9 @@
 import os
 import re
+from pathlib import Path
 from typing import List, Iterator, Mapping, Optional, Union, Tuple, cast
 from dataclasses import dataclass, replace
-from itertools import takewhile, count
+from itertools import takewhile, count, chain
 from lexer import lex, TokenSource
 from mytoken import MyToken, FileLocation
 
@@ -34,13 +35,22 @@ Definitions = Mapping[str, Macro]
 
 
 class VerilogAPreprocessor:
-    def __init__(self, source: TokenSource, definitions: Optional[Definitions] = None):
+    def __init__(
+        self,
+        source: TokenSource,
+        definitions: Optional[Definitions] = None,
+        include_path: Optional[list[str|Path]] = None
+    ):
         self.input_iterator = self.input_generator(source)
         self.output_iterator = self.output_generator()
         if definitions is None:
             self.definitions: Definitions = {}
         else:
             self.definitions = definitions
+        if include_path is None:
+            self.include_path = []
+        else:
+            self.include_path = [Path(p) for p in include_path]
 
     def __iter__(self):
         return self.output_iterator
@@ -83,7 +93,7 @@ class VerilogAPreprocessor:
                 self.fail("Unexpected `else")
             elif token.type == "ENDIFDEF":
                 self.fail("Unexpected `endif")
-            elif token.type == "PPINCLUDE":
+            elif token.type == "INCLUDE":
                 yield from self.include()
             elif token.type == "MACROCALL":
                 yield from self.macrocall()
@@ -149,6 +159,12 @@ class VerilogAPreprocessor:
             argument = list(self.output_generator(end=delimiter))
             yield argument
 
+    def skip_until(self, *types):
+        for token in self.input_iterator:
+            if token.type in types:
+                return
+        raise KeyError(types)
+
     def ifdef(self) -> TokenSource:
         name = self.expect("SIMPLE_IDENTIFIER", "ifdef").value
         found = name in self.definitions
@@ -157,13 +173,22 @@ class VerilogAPreprocessor:
             yield from self.output_generator(end=("ENDIFDEF", "ELSEDEF"))
             if self.last_token.type == "ELSEDEF":
                 # Drop `else block
-                list(self.output_generator(end="ENDIFDEF"))
+                self.skip_until("ENDIFDEF")
         else:
             # Drop this block
-            list(self.output_generator(end=("ENDIFDEF", "ELSEDEF")))
+            self.skip_until("ENDIFDEF", "ELSEDEF")
             if self.last_token.type == "ELSEDEF":
                 # Preprocess `else block
                 yield from self.output_generator(end="ENDIFDEF")
 
+    def find_file(self, f: str) -> Path:
+        parentfile = self.last_token.origin[-1][0]
+        for dirname in chain([Path(parentfile).parent], self.include_path):
+            ret = dirname / f
+            if ret.exists():
+                return ret
+        raise FileNotFoundError(f)
+
     def include(self):
-        raise NotImplementedError()
+        filename = self.find_file(self.expect("STRING_LITERAL", "include").value)
+        yield from VerilogAPreprocessor(lex(filename=filename), definitions=self.definitions)

@@ -27,7 +27,7 @@ tokens = (
         "IFDEF",
         "ELSEDEF",
         "ENDIFDEF",
-        "PPINCLUDE",
+        "INCLUDE",
         "MACROCALL",
         "NEWLINE",
     )
@@ -96,7 +96,6 @@ def t_error(t):
     raise Exception("Illegal character '%s'" % t.value[0])
 
 
-lexer = ply.lex.lex()
 
 TokenSource = Iterator[MyToken]
 
@@ -108,6 +107,10 @@ def lex(filename: Optional[str] = None, content: Optional[str] = None) -> TokenS
         ), "If filename is not provided then content is mandatory"
         with open(filename) as fd:
             content = fd.read()
+    # Can't create this at the module level because then the lexer is not reentrant
+    # This breaks lexing of included files
+    lexer = ply.lex.lex()
+    lexer.filename = filename
     lexer.line_beginning = 0
     lexer.lineno = 1
     lexer.input(content)
