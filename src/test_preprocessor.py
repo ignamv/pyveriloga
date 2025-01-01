@@ -20,6 +20,15 @@ def strip_token_origin(token):
         ),
         (
             """
+`define MULTILINE_MACRO(x,y) x=2;\
+        y=3;\
+
+1 `MULTILINE_MACRO(a,b) 4
+""",
+            "1 a=2; b=3; 4",
+        ),
+        (
+            """
 `define HOLA(x) x+2*x
 1 `HOLA(a) 4
 """,
