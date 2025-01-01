@@ -100,7 +100,7 @@ t_SYSTEM_IDENTIFIER = r"\$[a-zA-Z_\\][a-zA-Z0-9_$]*"
 
 
 def t_error(t):
-    raise Exception("Illegal character '%s'" % t.value[0])
+    raise Exception(f"Illegal character '{t.value[0]}' at {t.lexer.filename}:{t.lexer.lineno}")
 
 
 
