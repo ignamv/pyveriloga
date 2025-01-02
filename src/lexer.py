@@ -68,6 +68,15 @@ def t_COMMENT(t):
     t.lexer.line_beginning = t.lexpos + len(t.value)
 
 
+def t_MULTILINE_COMMENT(t):
+    r"/\*(?:.|\n)*?\*/"
+    newlines = t.value.count("\n")
+    if newlines:
+        t.lexer.lineno += newlines
+        newline_pos = t.value.rfind("\n")
+        t.lexer.line_beginning = t.lexpos + newline_pos + 1
+
+
 
 def t_REAL_NUMBER(t):
     r"\d+\.\d+([TGMKkmunpfa]|[eE][+-]*\d+)?|\d+([TGMKkmunpfa]|[eE][+-]*\d+)"

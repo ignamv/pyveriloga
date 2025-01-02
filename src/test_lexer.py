@@ -30,6 +30,13 @@ def token(type_, value=None):
                 MyToken("UNSIGNED_NUMBER", 4, [(None, 2, 1)]),
             ],
         ),
+        (
+            "3 /*pepe\nlolo*/4",
+            [
+                MyToken("UNSIGNED_NUMBER", 3, [(None, 1, 1)]),
+                MyToken("UNSIGNED_NUMBER", 4, [(None, 2, 7)]),
+            ],
+        ),
     ],
 )
 def test_lexer_with_location(source: str, expected_tokens: list[MyToken]):
