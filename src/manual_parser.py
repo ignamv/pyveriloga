@@ -406,7 +406,7 @@ class Parser:
             elif tok.type == "DISCIPLINE":
                 sourcefile.disciplines.append(self.discipline())
             else:
-                break
+                self.fail("Expected module, nature or discipline while parsing sourcefile")
         return sourcefile
 
 
