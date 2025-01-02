@@ -24,6 +24,7 @@ def parse_source(
         method = Parser.sourcefile
     parser = Parser(tokens)
     parsetree = method(parser)
+    print(parsetree)
     hir = LowerParseTree().lower(parsetree)
     return hir
 
@@ -33,7 +34,7 @@ def main():
     parser.add_argument("veriloga")
     parser.add_argument("-I", action="append")
     args = parser.parse_args()
-    parse_source(filename=args.veriloga, include_path=args.I)
+    print(parse_source(filename=args.veriloga, include_path=args.I))
     print("OK")
 
 
