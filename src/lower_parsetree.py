@@ -1,6 +1,7 @@
 from typing import Mapping, Optional, Tuple, Union, List, Sequence
 import hir
 import parsetree as pt
+from itertools import chain
 from functools import singledispatchmethod
 from contextlib import contextmanager
 from verilogatypes import VAType
@@ -173,14 +174,26 @@ class LowerParseTree:
                 self.lower(port) for port in module.ports if port.direction is not None
             ]
             ret.nets = list(map(self.lower, module.nets))
-            # ret.branches = list(map(self.lower, module.branches))
-            ret.variables = list(map(self.lower, module.variables))
-            for variable in ret.variables:
-                self.symboltable.define(variable)
             for net in ret.nets:
                 self.symboltable.define(net)
+            ret.branches = {(branch.net1.name,branch.net2.name): branch
+                    for branch in map(self.lower, module.branches)}
+            ret.variables = list(map(self.lower, module.variables))
+            for var in ret.variables:
+                self.symboltable.define(var)
+            for branch in ret.branches.values():
+                if branch.name:
+                    self.symboltable.define(branch)
             ret.statements = list(map(self.lower, module.statements))
         return ret
+
+    @lower.register
+    def _(self, branch: pt.Branch):
+        return hir.Branch(
+            name=branch.name.value,
+            net1=self.resolve(branch.nets[0]),
+            net2=self.resolve(branch.nets[1]) if len(branch.nets)>1 else None,
+        )
 
     @lower.register
     def _(self, port: pt.Port):
@@ -243,15 +256,28 @@ class LowerParseTree:
             else_=else_,
         )
 
-    def resolve_analog(self, accessor, net1, net2):
+    def resolve_analog(self, accessor, arg1, net2):
         """
         Determine if accessor is flow or potential, and check net compatibility
 
         Returns hir.Branch and "flow" or "potential"
         """
-        # TODO: handle branch argument
-        assert isinstance(net1, hir.Net)
         assert isinstance(accessor, hir.Accessor)
+        if isinstance(arg1, hir.Branch):
+            branch = arg1
+            net1 = branch.net1
+        else:
+            net1 = arg1
+            assert isinstance(net1, hir.Net)
+            if net2 is not None:
+                assert isinstance(net2, hir.Net)
+                assert net1.discipline is net2.discipline
+            else:
+                net2 = None
+            key = net1.name, net2.name if net2 is not None else None
+            if key not in self.module.branches:
+                self.module.branches[key] = hir.Branch(name='', net1=net1, net2=net2)
+            branch = self.module.branches[key]
         nature = accessor.nature
         if nature == net1.discipline.potential:
             type_ = "potential"
@@ -261,15 +287,7 @@ class LowerParseTree:
             raise Exception(
                 "Accessor is neither flow nor potential for given net", contribution
             )
-        if net2 is not None:
-            assert isinstance(net2, hir.Net)
-            assert net1.discipline is net2.discipline
-        else:
-            net2 = None
-        key = net1.name, net2.name if net2 is not None else None
-        if key not in self.module.branches:
-            self.module.branches[key] = hir.Branch(name='', net1=net1, net2=net2)
-        return self.module.branches[key], type_
+        return branch, type_
 
     @property
     def module(self):

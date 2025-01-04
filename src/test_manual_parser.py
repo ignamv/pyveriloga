@@ -47,7 +47,7 @@ def test_parser(
         tokens = [
             replace(tok, origin=[]) for tok in VerilogAPreprocessor(lex(content=source))
         ]
-    guard = [tok.guard]
+    guard = [tok.guard] if method is not Parser.sourcefile else []
     parser = Parser(tokens + guard)
     result = method(parser)
     unconsumed_tokens = list(parser.peekiterator)

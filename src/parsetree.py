@@ -63,12 +63,19 @@ class Net:
 
 
 @dataclass
+class Branch:
+    name: MyToken
+    nets: List[MyToken]
+
+
+@dataclass
 class Module:
     name: MyToken
     ports: List[Port] = field(default_factory=list)
     nets: List[Net] = field(default_factory=list)
     variables: List[Variable] = field(default_factory=list)
     statements: List[Statement] = field(default_factory=list)
+    branches: List[Branch] = field(default_factory=list)
 
 
 @dataclass

@@ -219,6 +219,7 @@ class Parser:
             nets = []
         variables = []
         statements = []
+        branches = []
         self.expect_type("SEMICOLON")
         while True:
             type_ = self.peek_type()
@@ -235,9 +236,12 @@ class Parser:
             elif type_ == "ANALOG":
                 self.next()
                 statements.append(self.statement())
+            elif type_ == "BRANCH":
+                branches.append(self.branch())
             else:
                 self.next()
                 self.fail("Invalid module item")
+        print(self.peek())
         self.next()
         return pt.Module(
             name=name,
@@ -245,6 +249,7 @@ class Parser:
             ports=ports,
             variables=variables,
             statements=statements,
+            branches=branches,
         )
 
     def list_of_ports(self):
@@ -391,6 +396,19 @@ class Parser:
             if tok.type == "SEMICOLON":
                 break
         return variables
+
+    def branch(self):
+        self.expect_type("BRANCH")
+        self.expect_type("LPAREN")
+        nets = [self.expect_type("SIMPLE_IDENTIFIER")]
+        if self.peek().type != "RPAREN":
+            self.expect_type("COMMA")
+            nets.append(self.expect_type("SIMPLE_IDENTIFIER"))
+        self.expect_type("RPAREN")
+        name = self.expect_type("SIMPLE_IDENTIFIER")
+        self.expect_type("SEMICOLON")
+        return pt.Branch(name=name, nets=nets)
+
 
     def sourcefile(self):
         sourcefile = pt.SourceFile()

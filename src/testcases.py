@@ -335,6 +335,8 @@ testcases_grouped = [
         module modname(inout disc1 p1);
         input p2, p3;
         disc2 p2, p3;
+        branch (p1, p3) branch13;
+        branch (p2) branch2;
         real real1, real2=4.5;
         integer int1=4, int2;
         endmodule
@@ -373,6 +375,10 @@ testcases_grouped = [
                                 pt.Variable(
                                     name=tok.int2, type=tok.INTEGER, initializer=None
                                 ),
+                            ],
+                            branches=[
+                                pt.Branch(name=tok.branch13, nets=[tok.p1, tok.p3]),
+                                pt.Branch(name=tok.branch2, nets=[tok.p2]),
                             ],
                         )
                     ],

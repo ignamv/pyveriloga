@@ -308,9 +308,11 @@ def test_lower_parsetree_branches():
     source = (
         DISCIPLINES
         + f"""
-module mymod(net1, net2);
-inout electrical net1, net2;
+module mymod(net1, net2, net3);
+inout electrical net1, net2, net3;
+branch (net1, net3) branch13;
 analog V(net1, net2) <+ I(net1, net2)
+analog V(branch13) <+ I(branch13)
 endmodule
 """
     )
@@ -321,7 +323,12 @@ endmodule
     contexts = [(None, SymbolTable(builtins.symbols.values()))]
     sourcefile = LowerParseTree(contexts=contexts).lower(parsetree).strip_parsed()
     module = sourcefile.modules[0]
-    assert len(module.branches) == 1
+    assert len(module.branches) == 2
     branch = module.branches["net1","net2"]
+    assert branch.name == ''
     assert branch.net1.name == 'net1'
     assert branch.net2.name == 'net2'
+    branch = module.branches["net1","net3"]
+    assert branch.name == 'branch13'
+    assert branch.net1.name == 'net1'
+    assert branch.net2.name == 'net3'
