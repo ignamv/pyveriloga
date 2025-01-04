@@ -168,6 +168,22 @@ class Variable(Symbol):
         )
 
 
+@dataclass(frozen=False)
+class Parameter(Symbol):
+    type_: VAType
+    initializer: Expression
+    parsed: Optional[pt.Parameter] = None
+
+    def strip_parsed(node: hir.Parameter):
+        return replace(
+            node,
+            parsed=None,
+            initializer=node.initializer.strip_parsed()
+            if node.initializer is not None
+            else None,
+        )
+
+
 Expression = Union[Literal, FunctionCall, Variable]
 
 
@@ -240,7 +256,7 @@ class Module(Symbol):
     ports: List[Port] = field(default_factory=list)
     nets: List[Net] = field(default_factory=list)
     branches: Mapping[Tuple[str,Optional[str]],Branch] = field(default_factory=dict)
-    parameters: List[Variable] = field(default_factory=list)
+    parameters: List[Parameter] = field(default_factory=list)
     variables: List[Variable] = field(default_factory=list)
     statements: List[Statement] = field(default_factory=list)
     parsed: Optional[pt.Module] = None

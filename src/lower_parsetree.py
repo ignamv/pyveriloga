@@ -179,8 +179,9 @@ class LowerParseTree:
             ret.branches = {(branch.net1.name,branch.net2.name): branch
                     for branch in map(self.lower, module.branches)}
             ret.variables = list(map(self.lower, module.variables))
-            for var in ret.variables:
-                self.symboltable.define(var)
+            ret.parameters = list(map(self.lower, module.parameters))
+            for x in chain(ret.variables, ret.parameters):
+                self.symboltable.define(x)
             for branch in ret.branches.values():
                 if branch.name:
                     self.symboltable.define(branch)
@@ -236,6 +237,16 @@ class LowerParseTree:
             type_=self.lower_type(variable.type),
             initializer=initializer,
             parsed=variable,
+        )
+
+    @lower.register
+    def _(self, parameter: pt.Parameter):
+        initializer = self.lower(parameter.initializer)
+        return hir.Parameter(
+            name=parameter.name.value,
+            type_=self.lower_type(parameter.type),
+            initializer=initializer,
+            parsed=parameter,
         )
 
     @lower.register
