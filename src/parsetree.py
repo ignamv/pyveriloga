@@ -76,6 +76,7 @@ class Module:
     variables: List[Variable] = field(default_factory=list)
     statements: List[Statement] = field(default_factory=list)
     branches: List[Branch] = field(default_factory=list)
+    parameters: List[Parameter] = field(default_factory=list)
 
 
 @dataclass
@@ -109,6 +110,14 @@ class Variable:
     name: MyToken
     type: MyToken
     initializer: Optional[Expression]
+
+
+@dataclass
+class Parameter:
+    name: MyToken
+    type: MyToken
+    initializer: Expression
+    # TODO: include/exclude ranges
 
 
 @dataclass

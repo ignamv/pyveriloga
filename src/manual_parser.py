@@ -43,7 +43,7 @@ class PeekIterator:
 
     def peek(self):
         if not self.buffer:
-            self.buffer.append(next(self.source))
+            self.buffer.insert(0,next(self.source))
         return self.buffer[0]
 
     def __next__(self):
@@ -220,6 +220,7 @@ class Parser:
         variables = []
         statements = []
         branches = []
+        parameters = []
         self.expect_type("SEMICOLON")
         while True:
             type_ = self.peek_type()
@@ -238,6 +239,12 @@ class Parser:
                 statements.append(self.statement())
             elif type_ == "BRANCH":
                 branches.append(self.branch())
+            elif type_ == "LATTR":
+                # TODO: attributes
+                while self.next().type != "RATTR":
+                    pass
+            elif type_ == "PARAMETER":
+                parameters.extend(self.parameter_declaration())
             else:
                 self.next()
                 self.fail("Invalid module item")
@@ -250,7 +257,64 @@ class Parser:
             variables=variables,
             statements=statements,
             branches=branches,
+            parameters=parameters,
         )
+
+
+    def parameter_declaration(self):
+        self.expect_type("PARAMETER")
+        parameters = []
+        type_ = self.expect_types(VARTYPES)
+        while True:
+            name = self.expect_type("SIMPLE_IDENTIFIER")
+            self.expect_type("ASSIGNOP")
+            initializer = self.expression()
+            if self.peek_type() not in ("COMMA", "SEMICOLON"):
+                self.param_range()
+            parameters.append(
+                pt.Parameter(name=name, type=type_, initializer=initializer)
+            )
+            tok = self.expect_types(("COMMA", "SEMICOLON"))
+            if tok.type == "SEMICOLON":
+                break
+        return parameters
+
+
+    def param_range(self):
+        # TODO: parameter ranges
+        while self.peek_type() not in ("SEMICOLON","COMMA"):
+            self.param_range_part()
+
+
+    def param_range_part(self):
+        tok = self.expect_types(("FROM","EXCLUDE"))
+        if self.peek_type() in ("LPAREN", "LBRACKET"):
+            self.next()
+            tok1 = self.peek().type
+            tok2 = self.peek().type
+            if tok1 == "INF":
+                self.next()
+            elif tok1 == "MINUS" and tok2 == "INF":
+                self.next()
+                self.next()
+            else:
+                self.expression()
+            self.expect_type("COLON")
+            tok1 = self.peek().type
+            tok2 = self.peek().type
+            if tok1 == "INF":
+                self.next()
+            elif tok1 == "MINUS" and tok2 == "INF":
+                self.next()
+                self.next()
+            else:
+                self.expression()
+            self.expect_types(("RPAREN","RBRACKET"))
+        else:
+            if tok.type != "EXCLUDE":
+                self.fail("from must be followed by an interval")
+            self.expression()
+
 
     def list_of_ports(self):
         self.expect_type("LPAREN")

@@ -272,6 +272,8 @@ def test_lower_parsetree_statement(statement_source, statement_lowered):
         + f"""
 module mymod(net1, net2);
 inout electrical net1, net2;
+(*desc= "hi", units = "Ohm" *) parameter real param_real1 = 3.2 from [0:inf];
+(*desc= "hi", units = "Ohm" *) parameter real param_int1 = 5;
 real real1, real2=4.5;
 integer int1=4, int2;
 analog {statement_source}
