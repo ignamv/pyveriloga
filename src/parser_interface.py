@@ -8,6 +8,8 @@ from typing import Optional, List
 from parsetree import ParseTree
 from mytoken import MyToken
 from hir import HIR
+from symboltable import SymbolTable
+from vabuiltins import builtins
 
 
 def parse_source(
@@ -25,7 +27,8 @@ def parse_source(
     parser = Parser(tokens)
     parsetree = method(parser)
     print(parsetree)
-    hir = LowerParseTree().lower(parsetree)
+    contexts = [(None, SymbolTable(builtins.symbols.values()))]
+    hir = LowerParseTree(contexts=contexts).lower(parsetree)
     return hir
 
 
