@@ -46,6 +46,7 @@ class CompiledModule:
         for symbol in codegen.variables.values():
             if isinstance(symbol, ir.GlobalVariable):
                 address = engine.get_global_value_address(symbol.name)
+                # FIXME wtf
                 type_ = POINTER(
                     vatype_to_ctype(VAType.int if "int" in symbol.name else VAType.real)
                 )
