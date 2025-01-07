@@ -62,6 +62,12 @@ def t_NEWLINE(t):
     return t
 
 
+def t_CONTINUATION(t):
+    r"\\\n"
+    t.lexer.lineno += 1
+    t.lexer.line_beginning = t.lexpos + len(t.value)
+
+
 def t_COMMENT(t):
     r"//.*\n"
     t.lexer.lineno += 1

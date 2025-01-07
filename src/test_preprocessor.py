@@ -20,8 +20,8 @@ def strip_token_origin(token):
         ),
         (
             """
-`define MULTILINE_MACRO(x,y) x=2;\
-        y=3;\
+`define MULTILINE_MACRO(x,y) x=2;\\
+        y=3;\\
 
 1 `MULTILINE_MACRO(a,b) 4
 """,
