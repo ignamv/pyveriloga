@@ -8,6 +8,7 @@ from verilogatypes import VAType
 import hir
 from parser_interface import parse_source
 from utils import DISCIPLINES
+from itertools import product
 
 
 def test_from_hir_mocking_module_to_llvm_module_ir(monkeypatch):
@@ -51,7 +52,7 @@ def test_compiled_module():
     run_analog = MagicMock()
     pointer_a = pointer(c_int(2))
     pointer_b = pointer(c_int(5))
-    mod = CompiledModule(run_analog, {"a": pointer_a, "b": pointer_b})
+    mod = CompiledModule(run_analog, {"a": pointer_a, "b": pointer_b}, parameters={})
     assert mod.vars["a"] == 2
     assert mod.vars["b"] == 5
     mod.vars["b"] = 9
@@ -153,6 +154,33 @@ def test_from_hir_if():
             assert compiled.vars["real3"] == x1 + 2 * x2
 
 
+def test_from_source_parameter():
+    source = (
+        DISCIPLINES
+        + """
+    module mymod();
+    parameter real par1 = 2.5;
+    parameter integer par2 = 4;
+    real out1;
+    integer out2;
+
+    analog begin
+        out1 = par1 + par2;
+        out2 = par1 - par2;
+    end
+
+    endmodule
+    """
+    )
+    module = parse_source(source).modules[0]
+    compiled = CompiledModule.from_hir(module)
+    compiled.parameters["par1"] = 4.5
+    compiled.parameters["par2"] = 7
+    compiled.run_analog()
+    assert compiled.vars["out1"] == 11.5
+    assert compiled.vars["out2"] == -2
+
+
 def test_from_source_if():
     source = (
         DISCIPLINES
@@ -223,3 +251,31 @@ def test_analogprobe():
         assert compiled.net_flow['net2'] == -7
         assert compiled.branch_potential["net3","net2"] == 5
         assert compiled.branch_potential["net1",None] == 6
+
+
+def test_resistor():
+    source = (
+        DISCIPLINES
+        + """
+    module mymod(net1, net2);
+    inout electrical net1, net2;
+    parameter real R=1;
+
+    analog begin
+        I(net1, net2) <+ V(net1, net2) / R;
+    end
+
+    endmodule
+    """
+    )
+    module = parse_source(source).modules[0]
+    compiled = CompiledModule.from_hir(module)
+    for r, i, j in product([0.1, 2e3], range(4), range(4)):
+        compiled.parameters["R"] = r
+        v1 = 2 + i * 0.1
+        v2 = 7 - i * 0.7
+        compiled.net_potential['net1'] = v1
+        compiled.net_potential['net2'] = v2
+        compiled.run_analog()
+        assert compiled.net_flow['net1'] == (v1 - v2) / r
+        assert compiled.net_flow['net2'] == -(v1 - v2) / r

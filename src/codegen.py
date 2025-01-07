@@ -35,6 +35,8 @@ class CodegenContext:
         self.functions = CustomDict(key=id)
         # Compiled variables
         self.variables = CustomDict(key=id)
+        # Compiled parameters
+        self.parameters = CustomDict(key=id)
         # Global variables set by simulator with net potentials
         self.net_potential = CustomDict(key=id)
         # Global variables set by module with net flow contributions
@@ -121,6 +123,10 @@ class CodegenContext:
     def _(self, variable: hir.Variable):
         return self.builder.load(self.variables[variable])
 
+    @expression_to_ir.register
+    def _(self, parameter: hir.Parameter):
+        return self.builder.load(self.parameters[parameter])
+
     def global_variable(self, name, type_):
         llvmtype = vatype_to_llvmtype(type_)
         irvar = ir.GlobalVariable( self.irmodule, llvmtype, name)
@@ -145,6 +151,8 @@ class CodegenContext:
         func = ir.Function(codegen.irmodule, functype, name="run_analog")
         for variable in module.variables:
             codegen.variables[variable] = codegen.global_variable(variable.name, variable.type_)
+        for parameter in module.parameters:
+            codegen.parameters[parameter] = codegen.global_variable(parameter.name, parameter.type_)
         for net in module.nets:
             codegen.net_potential[net] = codegen.global_variable('__net_potential_' + net.name, VAType.real)
             codegen.net_flow[net] = codegen.global_variable('__net_flow_' + net.name, VAType.real)
