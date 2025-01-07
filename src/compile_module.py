@@ -5,15 +5,29 @@ from compiler import compile_ir, get_engine, vatype_to_ctype
 from codegen import CodegenContext
 from ctypes import POINTER, cast
 
+def make_pointer_to_global(vatype, name):
+    address = get_engine().get_global_value_address(name)
+    type_ = POINTER(vatype_to_ctype(vatype))
+    return cast(address, type_)
 
 class CompiledModule:
-    def __init__(self, run_analog, variables, net_potential=None, net_flow=None):
+    def __init__(
+            self,
+            run_analog,
+            variables,
+            net_potential=None,
+            net_flow=None,
+            branch_potential=None,
+            branch_flow=None,
+        ):
         if net_potential is None:
             net_potential = {}
         self.net_potential = self.Vars(net_potential)
         if net_flow is None:
             net_flow = {}
         self.net_flow = self.Vars(net_flow)
+        self.branch_potential = self.Vars(branch_potential or {})
+        self.branch_flow = self.Vars(branch_flow or {})
         self.vars = self.Vars(variables)
         self.run_analog = run_analog
 
@@ -45,24 +59,34 @@ class CompiledModule:
         # TODO: choose only exported variables
         for symbol in codegen.variables.values():
             if isinstance(symbol, ir.GlobalVariable):
-                address = engine.get_global_value_address(symbol.name)
                 # FIXME wtf
-                type_ = POINTER(
-                    vatype_to_ctype(VAType.int if "int" in symbol.name else VAType.real)
+                variable_pointers[symbol.name] = make_pointer_to_global(
+                    VAType.int if "int" in symbol.name else VAType.real,
+                    symbol.name,
                 )
-                variable_pointers[symbol.name] = cast(address, type_)
-        net_potential = {}
-        for net, variable in codegen.net_potential.items():
-            address = engine.get_global_value_address(variable.name)
-            type_ = POINTER(
-                vatype_to_ctype(VAType.real)
-            )
-            net_potential[net.name] = cast(address, type_)
-        net_flow = {}
-        for net, variable in codegen.net_flow.items():
-            address = engine.get_global_value_address(variable.name)
-            type_ = POINTER(
-                vatype_to_ctype(VAType.real)
-            )
-            net_flow[net.name] = cast(address, type_)
-        return cls(run_analog=run_analog, variables=variable_pointers, net_potential=net_potential, net_flow=net_flow)
+        net_potential = {
+            net.name: make_pointer_to_global(VAType.real, variable.name)
+            for net, variable in codegen.net_potential.items()
+        }
+        net_flow = {
+            net.name: make_pointer_to_global(VAType.real, variable.name)
+            for net, variable in codegen.net_flow.items()
+        }
+        branch_potential = {
+            (branch.net1.name, branch.net2.name if branch.net2 is not None else None):
+            make_pointer_to_global(VAType.real, variable.name)
+            for branch, variable in codegen.branch_potential.items()
+        }
+        branch_flow = {
+            (branch.net1.name, branch.net2.name if branch.net2 is not None else None):
+            make_pointer_to_global(VAType.real, variable.name)
+            for branch, variable in codegen.branch_flow.items()
+        }
+        return cls(
+            run_analog=run_analog,
+            variables=variable_pointers,
+            net_potential=net_potential,
+            net_flow=net_flow,
+            branch_potential=branch_potential,
+            branch_flow=branch_flow,
+        )

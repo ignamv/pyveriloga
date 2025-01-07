@@ -204,7 +204,7 @@ def test_analogprobe():
     analog begin
         I(net1) <+ V(net1, net2);
         I(net2) <+ -V(net2);
-        V(net3, net2) <+ I(net2, net3);
+        V(net3, net2) <+ I(net3, net2);
         V(net1) <+ I(net1);
     end
 
@@ -216,6 +216,10 @@ def test_analogprobe():
     for _ in range(2):
         compiled.net_potential['net1'] = 3
         compiled.net_potential['net2'] = 7
+        compiled.branch_flow["net3","net2"] = 5
+        compiled.branch_flow["net1",None] = 6
         compiled.run_analog()
         assert compiled.net_flow['net1'] == -4
         assert compiled.net_flow['net2'] == -7
+        assert compiled.branch_potential["net3","net2"] == 5
+        assert compiled.branch_potential["net1",None] == 6
