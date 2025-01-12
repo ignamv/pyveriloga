@@ -496,6 +496,10 @@ class Parser:
     def block(self):
         statements = []
         self.expect_type("BEGIN")
+        if self.peek_type() == "COLON":
+            # Ignore block name
+            self.next()
+            self.expect_type("SIMPLE_IDENTIFIER")
         while self.peek_type() != "END":
             statements.append(self.statement())
         self.next()

@@ -415,13 +415,15 @@ testcases_grouped = [
             ),
             (
                 """
-            begin
+            begin: somelabel
             var1 = 4;
             var2 = 4.5;
             end
             """,
                 [
                     tok.BEGIN,
+                    tok.COLON,
+                    tok.somelabel,
                     tok.var1,
                     tok.ASSIGNOP,
                     tok(4),
