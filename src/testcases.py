@@ -9,6 +9,7 @@ def flatten(nested_list):
 
 
 simpleid = tok.name
+lval = tok.lval
 simpleid1 = tok.arg1
 one = tok(1)
 two = tok(2)
@@ -559,6 +560,22 @@ testcases_grouped = [
                             pt.Assignment(lvalue=tok.lval, value=pt.Literal(two)),
                         ),
                     ],
+                ),
+            ),
+            (
+                """
+                for (i=1; j<3; k = k+1) lval = lval + i;
+                """,
+                None,
+                pt.ForLoop(
+                    initial=pt.Assignment(lvalue=tok.i, value=pt.Literal(one)),
+                    condition=pt.Operation(tok.SMALLER, [pt.Identifier(tok.j), pt.Literal(three)]),
+                    change=pt.Assignment(lvalue=tok.k, value=pt.Operation(
+                        plus, [pt.Identifier(tok.k), pt.Literal(one)]
+                    )),
+                    statement=pt.Assignment(lvalue=lval, value=pt.Operation(
+                        plus, [pt.Identifier(lval), pt.Identifier(tok.i)],
+                    )),
                 ),
             ),
         ],

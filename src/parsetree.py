@@ -133,6 +133,14 @@ class Case:
 
 
 @dataclass
+class ForLoop:
+    initial: Assignment
+    condition: Expression
+    change: Assignment
+    statement: Statement
+
+
+@dataclass
 class SourceFile:
     natures: List[Nature] = field(default_factory=list)
     disciplines: List[Discipline] = field(default_factory=list)

@@ -402,9 +402,34 @@ class Parser:
             return self.system_task_call()
         elif type_ == "CASE":
             return self.case_()
+        elif type_ == "FOR":
+            return self.for_()
         else:
             self.next()
             self.fail("Expected analog statement")
+
+    def assignment(self):
+        lvalue = self.expect_type("SIMPLE_IDENTIFIER")
+        self.expect_type("ASSIGNOP")
+        value = self.expression()
+        return pt.Assignment(lvalue=lvalue, value=value)
+
+    def for_(self):
+        self.expect_type("FOR")
+        self.expect_type("LPAREN")
+        initial = self.assignment()
+        self.expect_type("SEMICOLON")
+        condition = self.expression()
+        self.expect_type("SEMICOLON")
+        change = self.assignment()
+        self.expect_type("RPAREN")
+        statement = self.statement()
+        return pt.ForLoop(
+            initial=initial,
+            condition=condition,
+            change=change,
+            statement=statement,
+        )
 
     def case_(self):
         self.expect_type("CASE")
