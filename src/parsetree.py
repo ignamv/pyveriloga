@@ -121,6 +121,18 @@ class Parameter:
 
 
 @dataclass
+class CaseItem:
+    expr: Optional[List[Expression]]
+    statement: Statement
+
+
+@dataclass
+class Case:
+    expr: Expression
+    items: CaseItem
+
+
+@dataclass
 class SourceFile:
     natures: List[Nature] = field(default_factory=list)
     disciplines: List[Discipline] = field(default_factory=list)

@@ -18,6 +18,7 @@ real1 = hir.Variable(name="real1", type_=VAType.real, initializer=None)
 real2 = hir.Variable(name="real2", type_=VAType.real, initializer=hir.Literal(4.5))
 param_real1 = hir.Parameter(name="param_real1", type_=VAType.real, initializer=hir.Literal(3.2))
 param_int1 = hir.Parameter(name="param_int1", type_=VAType.integer, initializer=hir.Literal(5))
+param_p2 = hir.Parameter(name="param_p2", type_=VAType.integer, initializer=hir.Literal(1))
 int1 = hir.Variable(name="int1", type_=VAType.integer, initializer=hir.Literal(4))
 int2 = hir.Variable(name="int2", type_=VAType.integer, initializer=None)
 charge = hir.Nature(name="Charge", units="coul", abstol=1e-14)
@@ -196,7 +197,7 @@ endmodule
     "statement_source,statement_lowered",
     [
         (
-            "int1 = real2 * int2",
+            "int1 = real2 * int2;",
             hir.Assignment(
                 lvalue=int1,
                 value=hir.FunctionCall(
@@ -217,7 +218,7 @@ endmodule
             ),
         ),
         (
-            "int1 = param_real1 * param_int1",
+            "int1 = param_real1 * param_int1;",
             hir.Assignment(
                 lvalue=int1,
                 value=hir.FunctionCall(
@@ -249,14 +250,14 @@ endmodule
             ])
         ),
         (
-            "if (real1) int1 = int2",
+            "if (real1) int1 = int2;",
             hir.If(
                 condition=real1,
                 then=hir.Assignment(lvalue=int1, value=int2),
             ),
         ),
         (
-            "if (real1) int1 = int2 else int2 = int1",
+            "if (real1) int1 = int2; else int2 = int1;",
             hir.If(
                 condition=real1,
                 then=hir.Assignment(lvalue=int1, value=int2),
@@ -264,25 +265,25 @@ endmodule
             ),
         ),
         (
-            "I(net1) <+ 4.5",
+            "I(net1) <+ 4.5;",
             hir.AnalogContribution(
                 hir.Branch(name='', net1=net1, net2=None), type_="flow", value=hir.Literal(4.5)
             ),
         ),
         (
-            "I(net1,net2) <+ 4.5",
+            "I(net1,net2) <+ 4.5;",
             hir.AnalogContribution(
                 hir.Branch(name='', net1=net1, net2=net2), type_="flow", value=hir.Literal(4.5)
             ),
         ),
         (
-            "V(net1) <+ 4.5",
+            "V(net1) <+ 4.5;",
             hir.AnalogContribution(
                 hir.Branch(name='', net1=net1, net2=None), type_="potential", value=hir.Literal(4.5)
             ),
         ),
         (
-            "V(net1,net2) <+ 4.5",
+            "V(net1,net2) <+ 4.5;",
             hir.AnalogContribution(
                 hir.Branch(name='', net1=net1, net2=net2), type_="potential", value=hir.Literal(4.5)
             ),
@@ -296,6 +297,7 @@ def test_lower_parsetree_statement(statement_source, statement_lowered):
 module mymod(net1, net2);
 inout electrical net1, net2;
 (*desc= "hi", units = "Ohm" *) parameter real param_real1 = 3.2 from [0:inf];
+(*desc= "hi", units = "Ohm" *) parameter integer param_p2 = 1 from [-1:1];
 (*desc= "hi", units = "Ohm" *) parameter integer param_int1 = 5;
 real real1, real2=4.5;
 integer int1=4, int2;
@@ -323,7 +325,7 @@ endmodule
             hir.Port(name="net2", direction="inout"),
         ],
         variables=[real1, real2, int1, int2],
-        parameters=[param_real1, param_int1],
+        parameters=[param_real1, param_p2, param_int1],
         statements=[statement_lowered],
         branches=module.branches,
     )
@@ -337,8 +339,8 @@ def test_lower_parsetree_branches():
 module mymod(net1, net2, net3);
 inout electrical net1, net2, net3;
 branch (net1, net3) branch13;
-analog V(net1, net2) <+ I(net1, net2)
-analog V(branch13) <+ I(branch13)
+analog V(net1, net2) <+ I(net1, net2);
+analog V(branch13) <+ I(branch13);
 endmodule
 """
     )

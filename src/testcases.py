@@ -25,6 +25,7 @@ comma = tok.COMMA
 ternary = tok.TERNARY
 colon = tok.COLON
 temperature = MyToken(type="SYSTEM_IDENTIFIER", value="$temperature", origin=[])
+strobe = MyToken(type="SYSTEM_IDENTIFIER", value="$strobe", origin=[])
 
 testcases_grouped = [
     (
@@ -290,7 +291,7 @@ testcases_grouped = [
         disc2 p2, p3;
         real real1, real2=4.5;
         integer int1=4, int2;
-        analog int1=real2
+        analog int1=real2;
         endmodule
         """,
                 None,
@@ -390,12 +391,12 @@ testcases_grouped = [
         Parser.statement,
         [
             (
-                "var1 = 4",
-                [tok.var1, tok.ASSIGNOP, tok(4)],
+                "var1 = 4;",
+                [tok.var1, tok.ASSIGNOP, tok(4), tok.SEMICOLON],
                 pt.Assignment(lvalue=tok.var1, value=pt.Literal(tok(4))),
             ),
             (
-                "I(n1,n2) <+ 4",
+                "I(n1,n2) <+ 4;",
                 [
                     tok.I,
                     tok.LPAREN,
@@ -405,6 +406,7 @@ testcases_grouped = [
                     tok.RPAREN,
                     tok.ANALOGCONTRIBUTION,
                     tok(4),
+                    tok.SEMICOLON,
                 ],
                 pt.AnalogContribution(
                     accessor=tok.I, arg1=tok.n1, arg2=tok.n2, value=pt.Literal(tok(4))
@@ -437,7 +439,24 @@ testcases_grouped = [
                 ),
             ),
             (
-                " if (cond) lval = val ",
+                """
+            begin
+            begin
+            var1 = 4;
+            end
+            var2 = 4.5;
+            end
+            """,
+                None,
+                pt.Block(
+                    [
+                        pt.Block([pt.Assignment(lvalue=tok.var1, value=pt.Literal(tok(4)))]),
+                        pt.Assignment(lvalue=tok.var2, value=pt.Literal(tok(4.5))),
+                    ]
+                ),
+            ),
+            (
+                " if (cond) lval = val;",
                 [
                     tok.IF_,
                     tok.LPAREN,
@@ -446,6 +465,7 @@ testcases_grouped = [
                     tok.lval,
                     tok.ASSIGNOP,
                     tok.val,
+                    tok.SEMICOLON,
                 ],
                 pt.If(
                     condition=pt.Identifier(tok.cond),
@@ -456,9 +476,9 @@ testcases_grouped = [
             (
                 """
                 if (cond)
-                lval = val
+                lval = val;
                 else
-                lval2 = val2
+                lval2 = val2;
                 """,
                 [
                     tok.IF,
@@ -468,10 +488,12 @@ testcases_grouped = [
                     tok.lval,
                     tok.ASSIGNOP,
                     tok.val,
+                    tok.SEMICOLON,
                     tok.ELSE,
                     tok.lval2,
                     tok.ASSIGNOP,
                     tok.val2,
+                    tok.SEMICOLON,
                 ],
                 pt.If(
                     condition=pt.Identifier(tok.cond),
@@ -485,17 +507,17 @@ testcases_grouped = [
                 """
                 if(cond_outer)
                   if(cond_inner)
-                    lval = val
+                    lval = val;
                   else
-                    lval2 = val2
+                    lval2 = val2;
                 """,
                 flatten(
                     [
                         [tok.IF, tok.LPAREN, tok.cond_outer, tok.RPAREN],
                         [tok.IF, tok.LPAREN, tok.cond_inner, tok.RPAREN],
-                        [tok.lval, tok.ASSIGNOP, tok.val],
+                        [tok.lval, tok.ASSIGNOP, tok.val, tok.SEMICOLON],
                         [tok.ELSE],
-                        [tok.lval2, tok.ASSIGNOP, tok.val2],
+                        [tok.lval2, tok.ASSIGNOP, tok.val2, tok.SEMICOLON],
                     ]
                 ),
                 pt.If(
@@ -510,6 +532,33 @@ testcases_grouped = [
                         ),
                     ),
                     else_=None,
+                ),
+            ),
+            (
+                "$strobe(3);",
+                None,
+                pt.FunctionCall(strobe, [pt.Literal(three)]),
+            ),
+            (
+                """
+                case(cond)
+                1,2: lval = 3;
+                default: lval = 2;
+                endcase
+                """,
+                None,
+                pt.Case(
+                    pt.Identifier(tok.cond),
+                    [
+                        pt.CaseItem(
+                            [pt.Literal(one), pt.Literal(two)],
+                            pt.Assignment(lvalue=tok.lval, value=pt.Literal(three)),
+                        ),
+                        pt.CaseItem(
+                            None,
+                            pt.Assignment(lvalue=tok.lval, value=pt.Literal(two)),
+                        ),
+                    ],
                 ),
             ),
         ],

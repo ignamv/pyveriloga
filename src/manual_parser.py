@@ -41,10 +41,11 @@ class PeekIterator:
     def __iter__(self):
         return self
 
-    def peek(self):
-        if not self.buffer:
+    def peek(self, position=1):
+        assert position > 0
+        if len(self.buffer) < position:
             self.buffer.insert(0,next(self.source))
-        return self.buffer[0]
+        return self.buffer[-position]
 
     def __next__(self):
         if self.buffer:
@@ -113,8 +114,8 @@ class Parser:
     def eof(self):
         return self.peekiterator.eof()
 
-    def peek(self):
-        return self.peekiterator.peek()
+    def peek(self, *args):
+        return self.peekiterator.peek(*args)
 
     def next(self):
         return next(self.peekiterator)
@@ -248,7 +249,6 @@ class Parser:
             else:
                 self.next()
                 self.fail("Invalid module item")
-        print(self.peek())
         self.next()
         return pt.Module(
             name=name,
@@ -291,7 +291,7 @@ class Parser:
         if self.peek_type() in ("LPAREN", "LBRACKET"):
             self.next()
             tok1 = self.peek().type
-            tok2 = self.peek().type
+            tok2 = self.peek(2).type
             if tok1 == "INF":
                 self.next()
             elif tok1 == "MINUS" and tok2 == "INF":
@@ -391,14 +391,62 @@ class Parser:
     def statement(self):
         type_ = self.peek_type()
         if type_ == "SIMPLE_IDENTIFIER":
-            return self.assignment_or_analogcontribution()
+            ret = self.assignment_or_analogcontribution()
+            self.expect_type("SEMICOLON")
+            return ret
         elif type_ == "BEGIN":
             return self.block()
         elif type_ == "IF":
             return self.if_()
+        elif type_ == "SYSTEM_IDENTIFIER":
+            return self.system_task_call()
+        elif type_ == "CASE":
+            return self.case_()
         else:
             self.next()
             self.fail("Expected analog statement")
+
+    def case_(self):
+        self.expect_type("CASE")
+        self.expect_type("LPAREN")
+        expr = self.expression()
+        self.expect_type("RPAREN")
+        items = []
+        while not items or self.peek_type() != "ENDCASE":
+            items.append(self.caseitem())
+        self.next()
+        return pt.Case(expr=expr, items=items)
+
+    def caseitem(self):
+        if self.peek_type() == "DEFAULT":
+            self.next()
+            expr = None
+        else:
+            expr = []
+            while True:
+                expr.append(self.expression())
+                type_ = self.peek_type()
+                if type_ == "COLON":
+                    break
+                elif type_ == "COMMA":
+                    self.next()
+        self.expect_type("COLON")
+        statement = self.statement()
+        return pt.CaseItem(expr=expr, statement=statement)
+
+    def system_task_call(self):
+        name = self.expect_type("SYSTEM_IDENTIFIER")
+        self.expect_type("LPAREN")
+        arguments = []
+        while self.peek_type() != "RPAREN":
+            arguments.append(self.expression())
+            if self.peek_type() == "RPAREN":
+                break
+            self.expect_type("COMMA", "separating function arguments")
+        self.next()
+        self.expect_type("SEMICOLON")
+        return pt.FunctionCall(name, arguments)
+
 
     def assignment_or_analogcontribution(self):
         lvalue_or_accessor = self.expect_type("SIMPLE_IDENTIFIER")
@@ -425,7 +473,6 @@ class Parser:
         self.expect_type("BEGIN")
         while self.peek_type() != "END":
             statements.append(self.statement())
-            self.expect_type("SEMICOLON")
         self.next()
         return pt.Block(statements=statements)
 
@@ -448,7 +495,6 @@ class Parser:
         while True:
             name = self.expect_type("SIMPLE_IDENTIFIER")
             tok = self.expect_types(("COMMA", "SEMICOLON", "ASSIGNOP"))
-            print(tok.type)
             if tok.type == "ASSIGNOP":
                 initializer = self.expression()
                 tok = self.expect_types(("COMMA", "SEMICOLON"))
@@ -488,6 +534,7 @@ class Parser:
             elif tok.type == "DISCIPLINE":
                 sourcefile.disciplines.append(self.discipline())
             else:
+                self.next()
                 self.fail("Expected module, nature or discipline while parsing sourcefile")
         return sourcefile
 

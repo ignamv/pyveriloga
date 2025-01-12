@@ -188,7 +188,7 @@ def test_from_source_if():
     module mymod();
     real real1, real2, real3;
 
-    analog if (real1) if (real2) real3=3 else real3=1 else if(real2) real3=2 else real3=0
+    analog if (real1) if (real2) real3=3; else real3=1; else if(real2) real3=2; else real3=0;
     endmodule
     """
     )
@@ -209,8 +209,8 @@ def test_analogcontribution():
     module mymod(net1, net2);
     inout electrical net1, net2;
 
-    analog I(net1) <+ 3.5
-    analog I(net2, net1) <+ 4.5
+    analog I(net1) <+ 3.5;
+    analog I(net2, net1) <+ 4.5;
     endmodule
     """
     )
@@ -279,3 +279,7 @@ def test_resistor():
         compiled.run_analog()
         assert compiled.net_flow['net1'] == (v1 - v2) / r
         assert compiled.net_flow['net2'] == -(v1 - v2) / r
+
+
+def test_compile_bsimbulk():
+    module = parse_source(filename="../inputfiles/dump/bsimbulk_without_functions.va", include_path=["../include"]).modules[0]
