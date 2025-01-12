@@ -156,7 +156,17 @@ class VerilogAPreprocessor:
         self.expect("LPAREN", "beginning of macro call argument list")
         for ii in range(number):
             delimiter = "COMMA" if ii != number - 1 else "RPAREN"
-            argument = list(self.output_generator(end=delimiter))
+            argument = []
+            nesting_level = 0
+            while True:
+                tok = next(self.input_iterator)
+                if tok.type == delimiter and nesting_level == 0:
+                    break
+                elif tok.type == "LPAREN":
+                    nesting_level += 1
+                elif tok.type == "RPAREN":
+                    nesting_level -= 1
+                argument.append(tok)
             yield argument
 
     def skip_until(self, *types):
