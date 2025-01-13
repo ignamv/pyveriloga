@@ -108,7 +108,7 @@ def test_preprocessor(src_in, src_out):
     assert preprocessed == expected
 
 
-@pytest.mark.xfail("??")
+@pytest.mark.xfail()
 @pytest.mark.parametrize(
     "src,expected",
     [

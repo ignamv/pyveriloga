@@ -63,6 +63,12 @@ builtins_list.extend(
         Variable(name="$temperature", type_=VAType.real, initializer=Literal(25)),
         Function(name="potential", type_=accessor),
         Function(name="flow", type_=accessor),
+        Function(name="flicker_noise", type_=FunctionSignature(
+            returntype=VAType.real, parameters=(VAType.real, VAType.real, VAType.string)
+        )),
+        Function(name="white_noise", type_=FunctionSignature(
+            returntype=VAType.real, parameters=(VAType.real, VAType.string)
+        )),
     ]
 )
 

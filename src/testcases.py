@@ -416,6 +416,7 @@ testcases_grouped = [
             (
                 """
             begin: somelabel
+            real v1 = 1;
             var1 = 4;
             var2 = 4.5;
             end
@@ -424,6 +425,11 @@ testcases_grouped = [
                     tok.BEGIN,
                     tok.COLON,
                     tok.somelabel,
+                    tok.REAL,
+                    tok.v1,
+                    tok.ASSIGNOP,
+                    tok(1),
+                    tok.SEMICOLON,
                     tok.var1,
                     tok.ASSIGNOP,
                     tok(4),
@@ -438,7 +444,9 @@ testcases_grouped = [
                     [
                         pt.Assignment(lvalue=tok.var1, value=pt.Literal(tok(4))),
                         pt.Assignment(lvalue=tok.var2, value=pt.Literal(tok(4.5))),
-                    ]
+                    ],
+                    name=tok.somelabel,
+                    declarations=[pt.Variable(name=tok.v1,type=tok.REAL,initializer=pt.Literal(one))]
                 ),
             ),
             (

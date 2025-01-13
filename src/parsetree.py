@@ -96,6 +96,8 @@ class AnalogContribution:
 @dataclass
 class Block:
     statements: List[Statement]
+    name: Optional[MyToken] = None
+    declarations: Optional[List[Variable]] = None
 
 
 @dataclass

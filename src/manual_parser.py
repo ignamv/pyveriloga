@@ -30,6 +30,20 @@ BUILTIN_FUNCTIONS = (
     "ASINH",
     "ACOSH",
     "ATANH",
+    "DDT",
+    "DDX",
+    "IDT",
+    "IDTMOD",
+    "ABSDELAY",
+    "TRANSITION",
+    "SLEW",
+    "LAST_CROSSING",
+    "LIMEXP",
+    "AC_STIM",
+    "WHITE_NOISE",
+    "FLICKER_NOISE",
+    "NOISE_TABLE",
+    "NOISE_TABLE_LOG",
 )
 
 
@@ -494,16 +508,22 @@ class Parser:
             )
 
     def block(self):
-        statements = []
         self.expect_type("BEGIN")
         if self.peek_type() == "COLON":
             # Ignore block name
             self.next()
-            self.expect_type("SIMPLE_IDENTIFIER")
+            name = self.expect_type("SIMPLE_IDENTIFIER")
+            declarations = []
+            while self.peek_type() in VARTYPES:
+                declarations.extend(self.variable_declaration())
+        else:
+            name = None
+            declarations = None
+        statements = []
         while self.peek_type() != "END":
             statements.append(self.statement())
         self.next()
-        return pt.Block(statements=statements)
+        return pt.Block(statements=statements, name=name, declarations=declarations)
 
     def if_(self):
         self.expect_type("IF")
